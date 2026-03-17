@@ -1,0 +1,2661 @@
+<!DOCTYPE html>
+<html lang="uz" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>O'zaro Autentifikatsiya — Kriptografik Protokollar Lab</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Outfit:wght@300;400;500;600;700;800;900&family=Crimson+Pro:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════
+   DESIGN TOKENS — DARK / LIGHT
+═══════════════════════════════════════════════════ */
+:root {
+  --tr: 0.22s cubic-bezier(.4,0,.2,1);
+}
+
+[data-theme="dark"] {
+  --bg0:    #070b14;
+  --bg1:    #0d1526;
+  --bg2:    #111d35;
+  --bg3:    #172442;
+  --surface:#1a2a47;
+  --surfl:  #1f3255;
+  --border: rgba(120,170,255,0.13);
+  --borderh:rgba(120,170,255,0.3);
+  --text:   #e8eef8;
+  --text2:  #7a96c0;
+  --text3:  #4a6080;
+  --shadow: rgba(0,0,0,0.6);
+
+  --blue:   #4d9fff;
+  --cyan:   #00d4ff;
+  --green:  #2ddb81;
+  --amber:  #f5a623;
+  --red:    #ff5f57;
+  --purple: #a78bfa;
+  --pink:   #f472b6;
+
+  --alice:  #4d9fff;
+  --bob:    #2ddb81;
+  --eve:    #ff5f57;
+  --trent:  #a78bfa;
+  --kdc:    #f5a623;
+
+  --code-bg:#0a1020;
+  --math-bg:rgba(245,166,35,0.07);
+  --math-border:rgba(245,166,35,0.25);
+  --math-text:#f5c842;
+
+  --ok-bg:  rgba(45,219,129,0.1);
+  --ok-b:   rgba(45,219,129,0.3);
+  --err-bg: rgba(255,95,87,0.1);
+  --err-b:  rgba(255,95,87,0.3);
+  --warn-bg:rgba(245,166,35,0.1);
+  --warn-b: rgba(245,166,35,0.3);
+}
+
+[data-theme="light"] {
+  --bg0:    #f0f4fc;
+  --bg1:    #e4eaf7;
+  --bg2:    #d8e2f3;
+  --bg3:    #ccd6ee;
+  --surface:#ffffff;
+  --surfl:  #f7faff;
+  --border: rgba(60,100,200,0.15);
+  --borderh:rgba(60,100,200,0.4);
+  --text:   #0e1a30;
+  --text2:  #3a5080;
+  --text3:  #7090b0;
+  --shadow: rgba(0,0,0,0.12);
+
+  --blue:   #1a6fd4;
+  --cyan:   #0097b8;
+  --green:  #1a9a5c;
+  --amber:  #c47a00;
+  --red:    #d32f2f;
+  --purple: #6d4fc2;
+  --pink:   #c2185b;
+
+  --alice:  #1a6fd4;
+  --bob:    #1a9a5c;
+  --eve:    #d32f2f;
+  --trent:  #6d4fc2;
+  --kdc:    #c47a00;
+
+  --code-bg:#f0f4fc;
+  --math-bg:rgba(196,122,0,0.06);
+  --math-border:rgba(196,122,0,0.3);
+  --math-text:#a06000;
+
+  --ok-bg:  rgba(26,154,92,0.08);
+  --ok-b:   rgba(26,154,92,0.3);
+  --err-bg: rgba(211,47,47,0.08);
+  --err-b:  rgba(211,47,47,0.3);
+  --warn-bg:rgba(196,122,0,0.08);
+  --warn-b: rgba(196,122,0,0.3);
+}
+
+/* ═══════════════════════════════════════════════════
+   RESET & BASE
+═══════════════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg0);
+  color: var(--text);
+  font-family: 'Outfit', sans-serif;
+  font-size: 15px;
+  line-height: 1.72;
+  min-height: 100vh;
+  transition: background var(--tr), color var(--tr);
+  overflow-x: hidden;
+}
+
+/* Animated grid bg */
+.grid-overlay {
+  position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 30%, transparent 100%);
+  transition: background var(--tr);
+}
+.glow-orb {
+  position: fixed; border-radius: 50%; pointer-events: none; z-index: 0;
+  filter: blur(80px); opacity: 0.06;
+  transition: background var(--tr);
+}
+.glow-orb.a { width: 500px; height: 500px; top: -100px; left: -100px; background: var(--blue); }
+.glow-orb.b { width: 400px; height: 400px; bottom: -80px; right: -80px; background: var(--cyan); }
+.glow-orb.c { width: 300px; height: 300px; top: 50%; left: 50%; transform: translate(-50%,-50%); background: var(--purple); }
+
+/* ═══════════════════════════════════════════════════
+   TOPBAR
+═══════════════════════════════════════════════════ */
+.topbar {
+  position: sticky; top: 0; z-index: 200;
+  display: flex; align-items: center; gap: 0;
+  background: rgba(7,11,20,0.88);
+  backdrop-filter: blur(24px) saturate(180%);
+  border-bottom: 1px solid var(--border);
+  transition: background var(--tr), border-color var(--tr);
+}
+[data-theme="light"] .topbar { background: rgba(240,244,252,0.92); }
+
+.brand {
+  padding: 0 24px;
+  font-family: 'DM Mono', monospace;
+  font-size: 12px;
+  color: var(--text2);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  border-right: 1px solid var(--border);
+  height: 52px;
+  display: flex; align-items: center; gap: 10px;
+}
+.brand-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--cyan); animation: pulse-dot 2s infinite; }
+@keyframes pulse-dot {
+  0%,100% { box-shadow: 0 0 0 0 rgba(0,212,255,0.4); }
+  50% { box-shadow: 0 0 0 6px rgba(0,212,255,0); }
+}
+
+.nav-tabs {
+  display: flex; flex: 1; overflow-x: auto;
+  scrollbar-width: none;
+}
+.nav-tabs::-webkit-scrollbar { display: none; }
+
+.ntab {
+  flex-shrink: 0;
+  padding: 0 22px; height: 52px;
+  display: flex; align-items: center; gap: 7px;
+  background: none; border: none;
+  color: var(--text2);
+  font-family: 'Outfit', sans-serif;
+  font-size: 13px; font-weight: 500;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all var(--tr);
+  white-space: nowrap;
+}
+.ntab:hover { color: var(--text); background: rgba(255,255,255,0.04); }
+.ntab.active { color: var(--blue); border-bottom-color: var(--blue); }
+.ntab .ti { font-size: 15px; }
+
+.topbar-right {
+  padding: 0 16px;
+  display: flex; align-items: center; gap: 8px;
+  border-left: 1px solid var(--border);
+  height: 52px;
+}
+.theme-toggle {
+  width: 40px; height: 22px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  cursor: pointer;
+  position: relative;
+  transition: all var(--tr);
+}
+.theme-toggle::after {
+  content: '';
+  position: absolute;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: var(--blue);
+  top: 2px; left: 2px;
+  transition: transform var(--tr);
+}
+[data-theme="light"] .theme-toggle::after { transform: translateX(18px); background: var(--amber); }
+.theme-label { font-size: 11px; color: var(--text3); font-family: 'DM Mono', monospace; }
+
+/* ═══════════════════════════════════════════════════
+   HERO
+═══════════════════════════════════════════════════ */
+.hero {
+  position: relative; z-index: 1;
+  padding: 56px 40px 48px;
+  border-bottom: 1px solid var(--border);
+  transition: border-color var(--tr);
+}
+.hero-chip {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 5px 14px;
+  background: var(--math-bg);
+  border: 1px solid var(--math-border);
+  border-radius: 20px;
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: var(--math-text);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 20px;
+}
+.hero h1 {
+  font-family: 'Outfit', sans-serif;
+  font-weight: 800;
+  font-size: clamp(1.9rem, 4.5vw, 3.4rem);
+  line-height: 1.08;
+  letter-spacing: -1px;
+  margin-bottom: 12px;
+}
+.hero h1 span {
+  background: linear-gradient(120deg, var(--blue) 0%, var(--cyan) 50%, var(--green) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.hero-sub {
+  font-size: 16px; color: var(--text2); max-width: 640px;
+  margin-bottom: 28px;
+}
+/* ═══════════════════════════════════════════════════
+   LAYOUT
+═══════════════════════════════════════════════════ */
+main { position: relative; z-index: 1; }
+.section {
+  display: none;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 40px 24px 80px;
+  animation: fadeSlide .3s ease;
+}
+.section.active { display: block; }
+@keyframes fadeSlide {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ═══════════════════════════════════════════════════
+   SECTION HEADERS
+═══════════════════════════════════════════════════ */
+.sec-header {
+  display: flex; align-items: flex-end; gap: 16px;
+  margin-bottom: 32px; padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+.sec-num {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px; letter-spacing: 2px;
+  color: var(--blue);
+  background: rgba(77,159,255,0.1);
+  border: 1px solid rgba(77,159,255,0.25);
+  padding: 3px 10px; border-radius: 4px;
+  margin-bottom: 4px; display: inline-block;
+}
+.sec-title {
+  font-family: 'Outfit', sans-serif;
+  font-weight: 700; font-size: 1.65rem;
+  letter-spacing: -0.5px;
+}
+.sec-desc { color: var(--text2); font-size: 14px; max-width: 600px; margin-top: 4px; }
+
+/* ═══════════════════════════════════════════════════
+   CARDS
+═══════════════════════════════════════════════════ */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 24px 28px;
+  margin-bottom: 20px;
+  transition: all var(--tr);
+  position: relative;
+  overflow: hidden;
+}
+.card::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--blue), transparent);
+  opacity: 0;
+  transition: opacity var(--tr);
+}
+.card:hover { border-color: var(--borderh); }
+.card:hover::before { opacity: 0.5; }
+
+.card-title {
+  font-size: 1.05rem; font-weight: 700;
+  margin-bottom: 14px;
+  display: flex; align-items: center; gap: 9px;
+  color: var(--text);
+}
+.card-title .ct-icon {
+  width: 32px; height: 32px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; flex-shrink: 0;
+}
+.ct-blue   { background: rgba(77,159,255,0.15); }
+.ct-green  { background: rgba(45,219,129,0.15); }
+.ct-amber  { background: rgba(245,166,35,0.15); }
+.ct-red    { background: rgba(255,95,87,0.15); }
+.ct-purple { background: rgba(167,139,250,0.15); }
+.ct-cyan   { background: rgba(0,212,255,0.15); }
+
+/* ═══════════════════════════════════════════════════
+   MATH BLOCKS
+═══════════════════════════════════════════════════ */
+.math {
+  background: var(--math-bg);
+  border: 1px solid var(--math-border);
+  border-left: 3px solid var(--math-text);
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin: 14px 0;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.88em;
+  color: var(--math-text);
+  overflow-x: auto;
+  line-height: 2;
+}
+.math .cm {
+  color: var(--text3);
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.88em;
+  display: block; margin-top: 2px;
+  font-style: italic;
+}
+.math .hi { color: var(--cyan); }
+.math .alice { color: var(--alice); }
+.math .bob   { color: var(--bob); }
+.math .trent { color: var(--trent); }
+.math .ok    { color: var(--green); }
+.math .bad   { color: var(--red); }
+.inline-m {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.88em;
+  color: var(--math-text);
+  background: var(--math-bg);
+  border: 1px solid var(--math-border);
+  padding: 1px 7px; border-radius: 4px;
+}
+
+/* ═══════════════════════════════════════════════════
+   INFO / ALERT BOXES
+═══════════════════════════════════════════════════ */
+.box {
+  border-radius: 10px; padding: 16px 20px; margin: 14px 0;
+  font-size: 14px;
+}
+.box.info  { background: rgba(77,159,255,0.08); border: 1px solid rgba(77,159,255,0.25); }
+.box.ok    { background: var(--ok-bg); border: 1px solid var(--ok-b); color: var(--green); }
+.box.warn  { background: var(--warn-bg); border: 1px solid var(--warn-b); color: var(--amber); }
+.box.err   { background: var(--err-bg); border: 1px solid var(--err-b); color: var(--red); }
+
+/* ═══════════════════════════════════════════════════
+   PROTOCOL DIAGRAM
+═══════════════════════════════════════════════════ */
+.proto-wrap { overflow-x: auto; }
+.proto-diag {
+  display: grid;
+  min-width: 560px;
+  gap: 0;
+}
+.proto-diag.two   { grid-template-columns: 180px 1fr 180px; }
+.proto-diag.three { grid-template-columns: 160px 1fr 160px 1fr 160px; }
+
+.actor {
+  border-radius: 12px;
+  padding: 20px 14px;
+  text-align: center;
+  position: relative;
+}
+.actor::after {
+  content: '';
+  position: absolute; bottom: -1px; left: 50%; transform: translateX(-50%);
+  width: 2px; height: 100vh; /* vertical timeline */
+  background: var(--border);
+  pointer-events: none;
+}
+.actor.alice-a { background: rgba(77,159,255,0.08); border: 1px solid rgba(77,159,255,0.25); }
+.actor.bob-a   { background: rgba(45,219,129,0.08); border: 1px solid rgba(45,219,129,0.25); }
+.actor.trent-a { background: rgba(167,139,250,0.08); border: 1px solid rgba(167,139,250,0.25); }
+.actor .a-ico  { font-size: 2rem; margin-bottom: 8px; }
+.actor .a-name { font-weight: 700; font-size: 0.95rem; }
+.actor.alice-a .a-name { color: var(--alice); }
+.actor.bob-a   .a-name { color: var(--bob); }
+.actor.trent-a .a-name { color: var(--trent); }
+.actor .a-role { font-size: 11px; color: var(--text3); font-family: 'DM Mono', monospace; margin-top: 3px; }
+
+.msg-col {
+  padding: 8px 0;
+  position: relative;
+}
+.msg {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+  font-size: 13px;
+}
+.msg.to-right { flex-direction: row; }
+.msg.to-left  { flex-direction: row-reverse; }
+.msg .m-arr { font-size: 18px; flex-shrink: 0; }
+.msg.to-right .m-arr { color: var(--alice); }
+.msg.to-left  .m-arr { color: var(--bob); }
+.msg .m-code {
+  font-family: 'DM Mono', monospace; font-size: 12px;
+  color: var(--amber); flex: 1;
+}
+.msg .m-desc { font-size: 12px; color: var(--text3); }
+.msg.step-num { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--text3); padding-left: 0; }
+
+/* ═══════════════════════════════════════════════════
+   STEP FLOW
+═══════════════════════════════════════════════════ */
+.steps { display: flex; flex-direction: column; gap: 0; position: relative; }
+.steps::before {
+  content: '';
+  position: absolute; left: 21px; top: 42px; bottom: 42px;
+  width: 1px;
+  background: linear-gradient(to bottom, var(--blue), var(--cyan), var(--green));
+  opacity: 0.3;
+}
+.step {
+  display: flex; gap: 18px; padding: 13px 0;
+  align-items: flex-start;
+}
+.sn {
+  flex-shrink: 0; width: 42px; height: 42px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'DM Mono', monospace; font-weight: 600;
+  font-size: 13px; color: var(--blue);
+  position: relative; z-index: 1;
+  transition: all var(--tr);
+}
+.step.done .sn { background: rgba(45,219,129,0.15); border-color: var(--green); color: var(--green); }
+.step.fail .sn { background: rgba(255,95,87,0.15); border-color: var(--red); color: var(--red); }
+.sc h4 { font-weight: 600; font-size: 0.92rem; color: var(--cyan); margin-bottom: 4px; }
+.sc p  { font-size: 14px; color: var(--text2); }
+
+/* ═══════════════════════════════════════════════════
+   LAB / SIMULATOR
+═══════════════════════════════════════════════════ */
+.lab-panel {
+  background: var(--bg1);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  margin-bottom: 24px;
+  transition: background var(--tr), border-color var(--tr);
+}
+.lab-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 22px;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+}
+.lab-title {
+  display: flex; align-items: center; gap: 10px;
+  font-family: 'DM Mono', monospace; font-size: 12px;
+  color: var(--text2); letter-spacing: 1px; text-transform: uppercase;
+}
+.lab-dot { width: 8px; height: 8px; border-radius: 50%; }
+.lab-dot.r { background: #ff5f57; }
+.lab-dot.y { background: #febc2e; }
+.lab-dot.g { background: #28c840; }
+.lab-dots { display: flex; gap: 6px; }
+
+.lab-body { padding: 24px; }
+
+/* Inputs */
+.input-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px; margin-bottom: 18px;
+}
+.input-group { display: flex; flex-direction: column; gap: 5px; }
+.input-group label {
+  font-family: 'DM Mono', monospace; font-size: 10px;
+  color: var(--text3); letter-spacing: 1.5px; text-transform: uppercase;
+}
+.input-group input, .input-group select {
+  padding: 9px 13px;
+  background: var(--bg0);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: 'DM Mono', monospace; font-size: 13px;
+  outline: none;
+  transition: all var(--tr);
+}
+.input-group input:focus,
+.input-group select:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(77,159,255,0.12);
+}
+[data-theme="light"] .input-group input,
+[data-theme="light"] .input-group select {
+  background: var(--bg3);
+}
+
+/* Buttons */
+.btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 10px 22px;
+  border: none; border-radius: 8px;
+  font-family: 'Outfit', sans-serif; font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: all var(--tr);
+  white-space: nowrap;
+}
+.btn.primary {
+  background: linear-gradient(135deg, var(--blue), var(--cyan));
+  color: #fff;
+}
+.btn.primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(77,159,255,0.35); }
+.btn.secondary {
+  background: var(--surface); border: 1px solid var(--border);
+  color: var(--text2);
+}
+.btn.secondary:hover { border-color: var(--blue); color: var(--blue); background: rgba(77,159,255,0.06); }
+.btn.danger {
+  background: rgba(255,95,87,0.1); border: 1px solid var(--red);
+  color: var(--red);
+}
+.btn.danger:hover { background: rgba(255,95,87,0.2); }
+.btn.step-btn {
+  background: rgba(167,139,250,0.1); border: 1px solid var(--purple);
+  color: var(--purple);
+}
+.btn.step-btn:hover { background: rgba(167,139,250,0.2); }
+.btn:active { transform: scale(0.97); }
+.btn .bi { font-size: 15px; }
+
+/* Terminal / Log */
+.terminal {
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 18px;
+  margin-top: 16px;
+  font-family: 'DM Mono', monospace; font-size: 12px;
+  line-height: 1.9;
+  max-height: 260px;
+  overflow-y: auto;
+  transition: background var(--tr), border-color var(--tr);
+}
+.terminal::-webkit-scrollbar { width: 4px; }
+.terminal::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.t-info   { color: var(--text3); }
+.t-send   { color: var(--alice); }
+.t-recv   { color: var(--bob); }
+.t-trent  { color: var(--trent); }
+.t-math   { color: var(--math-text); }
+.t-ok     { color: var(--green); font-weight: 600; }
+.t-fail   { color: var(--red); font-weight: 600; }
+.t-warn   { color: var(--amber); }
+.t-eve    { color: var(--eve); }
+.t-step   { color: var(--cyan); font-weight: 600; }
+
+/* Result cards */
+.result-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 14px; margin-top: 18px;
+}
+.result-card {
+  border-radius: 10px; padding: 16px;
+  border: 1px solid; font-family: 'DM Mono', monospace; font-size: 12px;
+}
+.result-card.alice-r { background: rgba(77,159,255,0.06); border-color: rgba(77,159,255,0.2); }
+.result-card.bob-r   { background: rgba(45,219,129,0.06); border-color: rgba(45,219,129,0.2); }
+.result-card.full-r  { background: rgba(0,212,255,0.05); border-color: rgba(0,212,255,0.2); grid-column: 1/-1; }
+.result-card.trent-r { background: rgba(167,139,250,0.06); border-color: rgba(167,139,250,0.2); }
+.result-card h4 {
+  font-family: 'Outfit', sans-serif; font-size: 12px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px;
+}
+.result-card.alice-r h4 { color: var(--alice); }
+.result-card.bob-r   h4 { color: var(--bob); }
+.result-card.full-r  h4 { color: var(--cyan); }
+.result-card.trent-r h4 { color: var(--trent); }
+.rr {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,0.04);
+  gap: 8px;
+}
+.rk { color: var(--text3); font-size: 11px; flex-shrink: 0; }
+.rv { color: var(--text); font-weight: 500; text-align: right; word-break: break-all; font-size: 11px; }
+.rv.ok   { color: var(--green); }
+.rv.fail { color: var(--red); }
+
+/* Status badge */
+.status-badge {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 7px 18px; border-radius: 20px;
+  font-size: 13px; font-weight: 600;
+  margin-top: 10px;
+}
+.sb-ok   { background: var(--ok-bg); border: 1px solid var(--ok-b); color: var(--green); }
+.sb-fail { background: var(--err-bg); border: 1px solid var(--err-b); color: var(--red); }
+
+/* ═══════════════════════════════════════════════════
+   CANVAS
+═══════════════════════════════════════════════════ */
+.canvas-wrap {
+  border-radius: 12px; overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--bg0);
+  transition: background var(--tr), border-color var(--tr);
+}
+canvas { display: block; width: 100%; }
+
+/* ═══════════════════════════════════════════════════
+   COMPARISON TABLE
+═══════════════════════════════════════════════════ */
+.ctbl {
+  width: 100%; border-collapse: collapse;
+  font-size: 13px; margin: 14px 0;
+}
+.ctbl th {
+  background: rgba(77,159,255,0.08);
+  color: var(--blue);
+  font-family: 'DM Mono', monospace; font-size: 11px;
+  letter-spacing: 1px; text-transform: uppercase;
+  padding: 12px 16px; text-align: left;
+  border: 1px solid var(--border);
+}
+.ctbl td {
+  padding: 10px 16px;
+  border: 1px solid var(--border);
+  vertical-align: top;
+  font-size: 13px;
+}
+.ctbl tr:hover td { background: rgba(77,159,255,0.03); }
+.td-ok  { color: var(--green); font-weight: 600; }
+.td-bad { color: var(--red); font-weight: 600; }
+.td-mid { color: var(--amber); font-weight: 600; }
+
+/* ═══════════════════════════════════════════════════
+   PROTO SUB-TABS
+═══════════════════════════════════════════════════ */
+.sub-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 20px; }
+.sub-tab {
+  padding: 7px 18px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: transparent;
+  color: var(--text2);
+  font-family: 'Outfit', sans-serif; font-size: 13px; font-weight: 500;
+  cursor: pointer; transition: all var(--tr);
+}
+.sub-tab:hover { border-color: var(--blue); color: var(--blue); }
+.sub-tab.active {
+  background: rgba(77,159,255,0.12);
+  border-color: var(--blue); color: var(--blue);
+}
+.sub-content { display: none; }
+.sub-content.active { display: block; }
+
+/* ═══════════════════════════════════════════════════
+   PROGRESS / QUIZ
+═══════════════════════════════════════════════════ */
+.prog-bar { background: var(--bg2); border-radius: 4px; height: 4px; margin: 16px 0; overflow: hidden; }
+.prog-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--blue), var(--cyan));
+  border-radius: 4px; transition: width 0.5s ease;
+}
+.q-num { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text3); margin-bottom: 8px; letter-spacing: 1px; }
+.q-text { font-size: 16px; font-weight: 600; margin-bottom: 16px; line-height: 1.4; }
+.q-opt {
+  display: block; width: 100%; text-align: left;
+  padding: 13px 18px; margin: 7px 0;
+  background: var(--bg1); border: 1px solid var(--border);
+  border-radius: 8px; color: var(--text);
+  font-family: 'Outfit', sans-serif; font-size: 14px;
+  cursor: pointer; transition: all var(--tr);
+}
+.q-opt:hover { background: rgba(77,159,255,0.08); border-color: var(--blue); }
+.q-opt.correct { background: var(--ok-bg); border-color: var(--green); color: var(--green); }
+.q-opt.wrong   { background: var(--err-bg); border-color: var(--red); color: var(--red); }
+.q-fb { display: none; border-radius: 8px; padding: 12px 16px; margin-top: 10px; font-size: 13px; }
+.q-fb.on { display: block; }
+.q-fb.ok-fb   { background: var(--ok-bg); border: 1px solid var(--ok-b); color: var(--green); }
+.q-fb.err-fb  { background: var(--err-bg); border: 1px solid var(--err-b); color: var(--red); }
+.score-panel {
+  text-align: center; padding: 40px 24px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+}
+.score-num {
+  font-family: 'Outfit', sans-serif; font-weight: 900; font-size: 5rem;
+  background: linear-gradient(135deg, var(--blue), var(--cyan));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+
+/* ═══════════════════════════════════════════════════
+   INFO GRID
+═══════════════════════════════════════════════════ */
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px; margin: 14px 0;
+}
+.info-item {
+  background: var(--bg1);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  transition: all var(--tr);
+}
+.info-item:hover { border-color: var(--borderh); }
+.ii-label { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
+.ii-value { font-size: 14px; font-weight: 600; color: var(--text); }
+
+/* ═══════════════════════════════════════════════════
+   TIMELINE (packet animation)
+═══════════════════════════════════════════════════ */
+.timeline-wrap {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--bg0);
+  margin: 16px 0;
+}
+.tl-header {
+  padding: 10px 20px;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text3);
+  display: flex; justify-content: space-between;
+}
+
+/* ═══════════════════════════════════════════════════
+   ATTACK VISUALIZER
+═══════════════════════════════════════════════════ */
+.atk-grid {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr auto 1fr;
+  gap: 12px; align-items: center;
+  padding: 20px 0;
+}
+.atk-box {
+  border-radius: 10px; padding: 16px;
+  text-align: center;
+}
+.atk-box .aico { font-size: 2rem; margin-bottom: 6px; }
+.atk-box .anm  { font-size: 13px; font-weight: 700; margin-top: 4px; }
+.atk-box.alice-atk { background: rgba(77,159,255,0.07); border: 1px solid rgba(77,159,255,0.25); }
+.atk-box.alice-atk .anm { color: var(--alice); }
+.atk-box.eve-atk   { background: rgba(255,95,87,0.07); border: 1px solid rgba(255,95,87,0.25); }
+.atk-box.eve-atk .anm   { color: var(--eve); }
+.atk-box.bob-atk   { background: rgba(45,219,129,0.07); border: 1px solid rgba(45,219,129,0.25); }
+.atk-box.bob-atk .anm   { color: var(--bob); }
+.atk-conn { text-align: center; font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text3); }
+
+/* Order game */
+.order-wrap { display: flex; flex-direction: column; gap: 8px; }
+.order-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 16px;
+  background: var(--bg1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: grab;
+  transition: all var(--tr);
+}
+.order-item:hover { border-color: var(--blue); }
+.order-item:active { cursor: grabbing; }
+.order-item.drag-over { border-color: var(--cyan); background: rgba(0,212,255,0.06); }
+.order-num {
+  width: 28px; height: 28px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'DM Mono', monospace; font-weight: 600;
+  font-size: 12px; color: var(--blue);
+  flex-shrink: 0;
+}
+
+/* ═══════════════════════════════════════════════════
+   NAZARIY QO'LLANMA
+═══════════════════════════════════════════════════ */
+.notes-mode { max-width: 900px !important; }
+.notes-mode .card { break-inside: avoid; }
+.notes-mode .math-block { break-inside: avoid; }
+.notes-header {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 12px; margin-bottom: 24px;
+  padding: 16px 20px; background: var(--bg1);
+  border: 1px solid var(--border); border-radius: 12px;
+}
+.notes-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.math-block {
+  position: relative;
+  background: var(--math-bg);
+  border: 1px solid var(--math-border);
+  border-left: 3px solid var(--math-text);
+  border-radius: 8px;
+  padding: 16px 48px 16px 20px;
+  margin: 14px 0;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.9em;
+  color: var(--math-text);
+  line-height: 1.9;
+}
+.math-block .copy-btn {
+  position: absolute; top: 10px; right: 10px;
+  width: 32px; height: 32px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; color: var(--text2);
+  transition: all var(--tr);
+}
+.math-block .copy-btn:hover { border-color: var(--blue); color: var(--blue); }
+.math-block .copy-btn.copied { border-color: var(--green); color: var(--green); }
+.card-collapse {
+  cursor: pointer;
+  user-select: none;
+}
+.card-collapse .collapse-ico {
+  transition: transform var(--tr);
+  display: inline-block;
+}
+.card-collapse.collapsed .collapse-ico { transform: rotate(-90deg); }
+.card-collapse.collapsed + .card-body { display: none; }
+.card-body { transition: all var(--tr); }
+.notes-editable:empty::before {
+  content: attr(data-placeholder);
+  color: var(--text3);
+  font-style: italic;
+}
+.term-tooltip {
+  border-bottom: 1px dashed var(--cyan);
+  cursor: help;
+  position: relative;
+}
+.term-tooltip:hover::after {
+  content: attr(data-tip);
+  position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%);
+  padding: 8px 12px; margin-bottom: 6px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 12px; color: var(--text);
+  white-space: nowrap; max-width: 280px;
+  white-space: normal; z-index: 100;
+  box-shadow: 0 8px 24px var(--shadow);
+}
+@media print {
+  .topbar, .hero, .btn, .theme-toggle, .notes-actions, .copy-btn,
+  .grid-overlay, .glow-orb, .nav-tabs, .card-collapse .collapse-ico { display: none !important; }
+  body { background: #fff; color: #111; }
+  .section { padding: 20px 0 !important; }
+  .notes-mode .card { box-shadow: none; border: 1px solid #ddd; }
+  .math-block { background: #f8f9fa; border-color: #dee2e6; }
+}
+
+/* ═══════════════════════════════════════════════════
+   RESPONSIVE
+═══════════════════════════════════════════════════ */
+@media (max-width: 720px) {
+  .hero { padding: 32px 20px; }
+  .section { padding: 24px 16px 60px; }
+  .proto-diag { min-width: 420px; }
+  .atk-grid { grid-template-columns: 1fr; }
+  .ntab { padding: 0 14px; font-size: 12px; }
+}
+</style>
+</head>
+<body>
+<div class="grid-overlay"></div>
+<div class="glow-orb a"></div>
+<div class="glow-orb b"></div>
+<div class="glow-orb c"></div>
+
+<!-- ═══ TOPBAR ═══ -->
+<div class="topbar">
+  <div class="brand">
+    <div class="brand-dot"></div>
+    CRYPTO · LAB
+  </div>
+  <div class="nav-tabs" id="navTabs">
+    <button class="ntab active" onclick="showSec('intro')">   <span class="ti">📘</span> Kirish</button>
+    <button class="ntab" onclick="showSec('theory')">         <span class="ti">🧮</span> Nazariya</button>
+    <button class="ntab" onclick="showSec('notes')">         <span class="ti">📝</span> Nazariy Qo'llanma</button>
+    <button class="ntab" onclick="showSec('protocols')">      <span class="ti">🔄</span> Protokollar</button>
+    <button class="ntab" onclick="showSec('lab')">            <span class="ti">⚗️</span> Laboratoriya</button>
+    <button class="ntab" onclick="showSec('attacks')">        <span class="ti">⚔️</span> Hujumlar</button>
+    <button class="ntab" onclick="showSec('compare')">         <span class="ti">📊</span> Taqqoslash</button>
+    <button class="ntab" onclick="showSec('quiz')">           <span class="ti">🎯</span> Test</button>
+  </div>
+  <div class="topbar-right">
+    <span class="theme-label" id="themeLabel">DARK</span>
+    <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Temani o'zgartirish"></button>
+  </div>
+</div>
+
+<!-- ═══ HERO ═══ -->
+<div class="hero">
+  <div class="hero-chip">🔐 Kriptografik Protokollar — Mavzu 7</div>
+  <h1><span>O'zaro Autentifikatsiya</span><br>Protokollari</h1>
+  <p class="hero-sub">
+    ISO/IEC 9798, Needham-Schroeder, Kerberos, STS — matematik asoslar, haqiqiy hisob-kitoblar va interaktiv laboratoriya simulyatsiyasi.
+  </p>
+</div>
+
+<main>
+
+<!-- ═══════════════════════════════════════════════════
+     SEC 1: KIRISH
+═══════════════════════════════════════════════════ -->
+<section class="section active" id="intro">
+  <div class="sec-header">
+    <div>
+      <div class="sec-num">MODUL 01</div>
+      <div class="sec-title">Kirish va Asosiy Tushunchalar</div>
+      <div class="sec-desc">Autentifikatsiya nima, nima uchun ikki tomonlama kerak va qaysi muammolarni hal qiladi</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><div class="ct-icon ct-blue">❓</div>Muammo: Bir tomonlama autentifikatsiya etarli emasmi?</div>
+    <p>Klassik <span class="term-tooltip" data-tip="Challenge-Response: server savol beradi, mijoz javob beradi">Savol-Javob</span> protokolida faqat <strong>mijoz</strong> o'zini isbotlaydi. Lekin bu juda xavfli:</p>
+    <div class="box warn">
+      ⚠️ <strong>Masalan:</strong> Siz "bank.uz" saytiga kirasiz — lekin bu haqiqiy bank serveri ekanligini qanday bilasiz? Tajovuzkor soxta server yaratib, sizning ma'lumotlaringizni o'g'irlashi mumkin.
+    </div>
+    <div class="math">
+      <span class="cm">// Bir tomonlama (unilateral) autentifikatsiya:</span><br>
+      C → S : ID_C  <span class="cm">← C=mijoz, S=server, ID_C=mijoz identifikatori</span><br>
+      S → C : r  <span class="cm">← r=server nonce (tasodifiy savol)</span><br>
+      C → S : f(K, r)  <span class="cm">← f(K,r)=kalit K bilan javob; mijoz o'zini isbotlaydi</span><br>
+      S → C : OK<br>
+      <span class="cm">// Lekin: S haqiqiy ekanini kim tekshirdi? HECH KIM!</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><div class="ct-icon ct-green">✅</div>Yechim: O'zaro (Mutual) Autentifikatsiya</div>
+    <p><strong><span class="term-tooltip" data-tip="Mutual Authentication — ikkala tomon ham bir-birini tasdiqlaydi">O'zaro autentifikatsiya</span></strong> — ikkala tomon ham bir-birini kriptografik jihatdan tasdiqlaydi:</p>
+    <div class="math">
+      <span class="alice">Alisa</span> → isbotlaydi → <span class="bob">Bob</span><br>
+      <span class="bob">Bob</span>   → isbotlaydi → <span class="alice">Alisa</span><br>
+      <br>
+      <span class="ok">Natija: Har ikkalasi ham haqiqiy ekanini biladi!</span>
+    </div>
+    <div class="steps" style="margin-top:14px">
+      <div class="step">
+        <div class="sn">1</div>
+        <div class="sc"><h4>Identifikatsiya</h4><p>Har ikki tomon o'z identifikatorlarini e'lon qiladi</p></div>
+      </div>
+      <div class="step">
+        <div class="sn">2</div>
+        <div class="sc"><h4>Nonce almashinuvi</h4><p>Har tomon tasodifiy r_A va r_B nonce yaratadi</p></div>
+      </div>
+      <div class="step">
+        <div class="sn">3</div>
+        <div class="sc"><h4>Ikki tomonlama javob</h4><p>Har tomon boshqasining nonce-ga javob beradi: f(K, r_B) va f(K, r_A)</p></div>
+      </div>
+      <div class="step">
+        <div class="sn">4</div>
+        <div class="sc"><h4>Ikki tomonlama tekshirish</h4><p>Har tomon sherigining javobini tekshiradi — ikkalasi tasdiqlangan!</p></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><div class="ct-icon ct-amber">📜</div>Tarixiy kontekst va standartlar</div>
+    <div class="info-grid">
+      <div class="info-item"><div class="ii-label">Needham-Schroeder</div><div class="ii-value">1978 — Asos protokol</div></div>
+      <div class="info-item"><div class="ii-label">Kerberos v5</div><div class="ii-value">1993 — KDC asosida</div></div>
+      <div class="info-item"><div class="ii-label">ISO/IEC 9798-2</div><div class="ii-value">1994 — Simmetrik standart</div></div>
+      <div class="info-item"><div class="ii-label">STS protokoli</div><div class="ii-value">1992 — Imzo asosida</div></div>
+      <div class="info-item"><div class="ii-label">TLS 1.3</div><div class="ii-value">2018 — Zamonaviy standart</div></div>
+      <div class="info-item"><div class="ii-label">FIDO2/WebAuthn</div><div class="ii-value">2019 — Parolsiz</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><div class="ct-icon ct-cyan">🔗</div>Oldingi mavzular bilan bog'liqlik</div>
+    <table class="ctbl">
+      <tr>
+        <th>Mavzu</th><th>Asosiy g'oya</th><th>Ushbu mavzuga hissa</th>
+      </tr>
+      <tr>
+        <td>Lamport protokoli</td>
+        <td>Hash zanjiri OTP</td>
+        <td><span class="td-ok">Bir tomonlama C-R asosi</span></td>
+      </tr>
+      <tr>
+        <td>Parol mustahkamligi</td>
+        <td>Entropiya ölçhovi</td>
+        <td><span class="td-ok">K kalit kuchi talablari</span></td>
+      </tr>
+      <tr>
+        <td>Savol-Javob (C-R)</td>
+        <td>Nonce + HMAC</td>
+        <td><span class="td-ok">O'zaro autentifikatsiya asosi</span></td>
+      </tr>
+      <tr>
+        <td>Diffie-Hellman</td>
+        <td>Ochiq kalit almashinuvi</td>
+        <td><span class="td-ok">STS protokolida ishlatiladi</span></td>
+      </tr>
+    </table>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════
+     SEC 2: NAZARIYA
+═══════════════════════════════════════════════════ -->
+<section class="section" id="theory">
+  <div class="sec-header">
+    <div>
+      <div class="sec-num">MODUL 02</div>
+      <div class="sec-title">Matematik Asoslar</div>
+      <div class="sec-desc">HMAC, nonce, xavfsizlik modeli va kriptografik talablar</div>
+    </div>
+  </div>
+
+  <!-- Formulalar lug'ati -->
+  <div class="card" style="border-left:3px solid var(--cyan)">
+    <div class="card-title"><div class="ct-icon ct-cyan">📖</div>Formulalardagi belgilar — izoh</div>
+    <p style="margin-bottom:12px">Quyidagi belgilar barcha protokollarda qayta-qayta ishlatiladi. Eslab qoling:</p>
+    <div class="info-grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">
+      <div class="info-item"><div class="ii-label">r_A, r_B</div><div class="ii-value">Nonce — har sessiyada yangi tasodifiy son</div></div>
+      <div class="info-item"><div class="ii-label">‖</div><div class="ii-value">Birlashtirish — ma'lumotlarni ketma-ket yozish</div></div>
+      <div class="info-item"><div class="ii-label">MAC, MAC_K</div><div class="ii-value">Maxfiy imzo — kalit K bilan hisoblangan</div></div>
+      <div class="info-item"><div class="ii-label">ID_A, ID_B</div><div class="ii-value">Alisa va Bob identifikatorlari (ism/login)</div></div>
+      <div class="info-item"><div class="ii-label">K</div><div class="ii-value">Kalit — maxfiy shifrlash/tekshirish kaliti</div></div>
+      <div class="info-item"><div class="ii-label">E_K(...)</div><div class="ii-value">Shifrlash — K kalit bilan shifrlangan ma'lumot</div></div>
+      <div class="info-item"><div class="ii-label">K_S</div><div class="ii-value">Sessiya kaliti — faqat shu aloqa uchun</div></div>
+      <div class="info-item"><div class="ii-label">g^x, g^y</div><div class="ii-value">Diffie-Hellman — sir sonlar (x,y) dan hisoblangan</div></div>
+      <div class="info-item"><div class="ii-label">sk, pk</div><div class="ii-value">Xususiy va ochiq kalit (imzo uchun)</div></div>
+      <div class="info-item"><div class="ii-label">σ (sigma)</div><div class="ii-value">Raqamli imzo</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><div class="ct-icon ct-amber">🔢</div>Nonce va Tasodifiylik</div>
+    <p>O'zaro autentifikatsiyada <strong>har ikki tomon</strong> o'z nonce-ini yaratadi:</p>
+    <div class="math">
+      r_A — Alisa tasodifiy soni (har sessiyada yangi)<br>
+      r_B — Bob tasodifiy soni (har sessiyada yangi)<br>
+      <br>
+      <span class="cm">Nima uchun muhim?</span><br>
+      Eski sessiyadan r_A ni qayta yuborsa, hujumchi eski MAC ni ham yuborishi kerak.<br>
+      Lekin Bob har safar <strong>yangi</strong> r_B yuboradi → eski MAC yangi r_B ga mos kelmaydi → hujum muvaffaqiyatsiz!
+    </div>
+    <div class="box info">💡 Ikkala nonce birga ishlatilganda — har ikki tomonga oid replay hujumlari ham bloklanadi.</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><div class="ct-icon ct-blue">🔐</div>HMAC — Qisqacha tushuntirish</div>
+    <p><strong>HMAC</strong> (Keyed-Hash Message Authentication Code) — kalit va xabardan <strong>maxfiy imzo</strong> (MAC) yaratadi. Faqat kalitni bilgan tomon to'g'ri MAC hisoblashi mumkin.</p>
+    <div class="math">
+      <span class="cm">Oddiy g'oya:</span><br>
+      MAC = maxfiy_funksiya(Kalit, Xabar)  <span class="cm">← K=kalit, xabar=nonce+identifikator</span><br>
+      <br>
+      <span class="cm">O'zaro autentifikatsiyada:</span><br>
+      Bob: MAC = HMAC(K, r_B + r_A + "Alisa")  <span class="cm">← r_B,r_A=nonce, "Alisa"=ID_A</span><br>
+      Alisa: MAC = HMAC(K, r_A + r_B + "Bob")  <span class="cm">← "Bob"=ID_B</span><br>
+      <br>
+      Haqiqiy tizimlarda SHA-256 xesh ishlatiladi. Bizda demo uchun soddalashtirilgan versiya.
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><div class="ct-icon ct-purple">📐</div>ISO/IEC 9798-2 Formal Ta'rif</div>
+    <div class="math">
+      <span class="cm">// 3-xabarli o'zaro autentifikatsiya (simmetrik kalit):</span><br>
+      <br>
+      <span class="alice">Alisa</span> → <span class="bob">Bob</span> : r_A  <span class="cm">← r_A: Alisa nonce (tasodifiy son)</span><br>
+      <br>
+      <span class="bob">Bob</span>   → <span class="alice">Alisa</span> : r_B ‖ MAC<sub>K</sub>(r_B ‖ r_A ‖ ID_A)<br>
+      <span class="cm">↑ ‖ = birlashtirish; MAC_K = kalit K bilan imzo; ID_A = Alisa identifikatori (ismi)</span><br>
+      <span class="cm">↑ Bob o'zini isbotladi</span><br>
+      <br>
+      <span class="alice">Alisa</span> → <span class="bob">Bob</span> : MAC<sub>K</sub>(r_A ‖ r_B ‖ ID_B)<br>
+      <span class="cm">↑ ID_B = Bob identifikatori (ismi)</span><br>
+      <span class="cm">↑ Alisa o'zini isbotladi</span><br>
+      <br>
+      <span class="ok">Tekshirish:</span><br>
+      Alisa: MAC<sub>K</sub>(r_B ‖ r_A ‖ ID_A) =? qabul qilingan  <span class="cm">← Alisa o'z MAC hisoblab solishtiradi</span><br>
+      Bob:   MAC<sub>K</sub>(r_A ‖ r_B ‖ ID_B) =? qabul qilingan  <span class="cm">← Bob o'z MAC hisoblab solishtiradi</span><br>
+    </div>
+    <div class="box ok">✅ <strong>To'g'rilik:</strong> Agar K ikkala tomonda bir xil bo'lsa va xabarlar o'zgartirilmagan bo'lsa — ikkalasi ham muvaffaqiyatli tasdiqlaydi.</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><div class="ct-icon ct-cyan">🛡️</div>Xavfsizlik Xususiyatlari</div>
+    <table class="ctbl">
+      <tr><th>Xususiyat</th><th>Ta'rif</th><th>Qanday ta'minlanadi</th></tr>
+      <tr>
+        <td><strong>Mutual Auth</strong></td>
+        <td>Ikki tomon ham tasdiqlangan</td>
+        <td><span class="td-ok">Ikki tomonlama MAC</span></td>
+      </tr>
+      <tr>
+        <td><strong>Freshness</strong></td>
+        <td>Eski xabarlar ishlamaydi</td>
+        <td><span class="td-ok">Nonce + timestamp</span></td>
+      </tr>
+      <tr>
+        <td><strong>Replay Protection</strong></td>
+        <td>Qayta uzatish hujumi bloklanadi</td>
+        <td><span class="td-ok">r_A va r_B birga</span></td>
+      </tr>
+      <tr>
+        <td><strong>Key Confirmation</strong></td>
+        <td>Bir xil kalit bor-yo'qligini tasdiqlash</td>
+        <td><span class="td-ok">MAC(K, r_A‖r_B)</span> <span class="cm">← ‖ = birlashtirish</span></td>
+      </tr>
+      <tr>
+        <td><strong>Identity Protection</strong></td>
+        <td>Shaxsni fosh qilmaslik</td>
+        <td><span class="td-mid">Faqat asimmetrik versiyada</span></td>
+      </tr>
+    </table>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════
+     SEC: NAZARIY QO'LLANMA
+═══════════════════════════════════════════════════ -->
+<section class="section notes-mode" id="notes">
+  <div class="sec-header">
+    <div>
+      <div class="sec-num">NAZARIY QO'LLANMA</div>
+      <div class="sec-title">O'zaro Autentifikatsiya — Tez daftar uchun</div>
+      <div class="sec-desc">Qisqacha nazariy ma'lumot. Chop etish yoki nusxa olish uchun qulay.</div>
+    </div>
+  </div>
+
+  <div class="notes-header">
+    <div>
+      <strong>📋 Ma'lumotlar:</strong>
+      <span style="color:var(--text2);font-size:13px;margin-left:8px">Mavzu 7 · Kriptografik Protokollar</span>
+    </div>
+    <div class="notes-actions">
+      <button class="btn secondary" onclick="window.print()"><span class="bi">🖨️</span> Chop etish</button>
+      <button class="btn secondary" onclick="expandAllNotes()"><span class="bi">📂</span> Hammasini ochish</button>
+      <button class="btn secondary" onclick="collapseAllNotes()"><span class="bi">📁</span> Hammasini yopish</button>
+    </div>
+  </div>
+
+  <!-- 1. Kirish -->
+  <div class="card">
+    <div class="card-title card-collapse" onclick="toggleCard(this)">
+      <span class="collapse-ico">▼</span>
+      <div class="ct-icon ct-blue">1</div>
+      O'zaro autentifikatsiya — tushuncha va zarurligi
+    </div>
+    <div class="card-body">
+      <p><strong>O'zaro autentifikatsiya</strong> — ikkala tomon ham bir-birini kriptografik jihatdan tasdiqlaydi. Bir tomonlama autentifikatsiyada faqat mijoz o'zini isbotlaydi, lekin server haqiqiy ekanini tekshirilmaydi (soxta server xavfi).</p>
+      <div class="math-block">
+        <button class="copy-btn" onclick="copyMath(this)" title="Nusxa olish">📋</button>
+        Alisa → isbotlaydi → Bob<br>
+        Bob   → isbotlaydi → Alisa<br>
+        Natija: Har ikkalasi ham haqiqiy ekanini biladi!
+      </div>
+      <p><strong>Asosiy bosqichlar:</strong> ① Identifikatsiya ② Nonce almashinuvi ③ Ikki tomonlama MAC javob ④ Tekshirish</p>
+    </div>
+  </div>
+
+  <!-- 2. Nonce va HMAC -->
+  <div class="card">
+    <div class="card-title card-collapse" onclick="toggleCard(this)">
+      <span class="collapse-ico">▼</span>
+      <div class="ct-icon ct-amber">2</div>
+      Nonce va HMAC
+    </div>
+    <div class="card-body">
+      <p><span class="term-tooltip" data-tip="Number used ONCE — bir marta ishlatiladigan tasodifiy son">Nonce</span> — har sessiyada yangi tasodifiy son. Eski nonce qayta ishlatilsa, MAC mos kelmaydi → replay hujum bloklanadi.</p>
+      <div class="math-block">
+        <button class="copy-btn" onclick="copyMath(this)" title="Nusxa olish">📋</button>
+        r_A — Alisa nonce (har safar yangi)<br>
+        r_B — Bob nonce (har safar yangi)<br>
+        Ikkalasi ham MAC ga kiritiladi → ikkala tomonga replay himoya
+      </div>
+      <p><strong>HMAC</strong> — kalit va xabardan maxfiy imzo (MAC) yaratadi. Faqat kalitni bilgan tomon to'g'ri MAC hisoblashi mumkin.</p>
+    </div>
+  </div>
+
+  <!-- 3. ISO 9798-2 -->
+  <div class="card">
+    <div class="card-title card-collapse" onclick="toggleCard(this)">
+      <span class="collapse-ico">▼</span>
+      <div class="ct-icon ct-green">3</div>
+      ISO/IEC 9798-2 — 3-xabarli protokol
+    </div>
+    <div class="card-body">
+      <p>Simmetrik kalit K_AB — oldindan kelishilgan. 3 ta xabar:</p>
+      <div class="math-block">
+        <button class="copy-btn" onclick="copyMath(this)" title="Nusxa olish">📋</button>
+        ① A → B : r_A  <span class="cm">(r_A=nonce)</span><br>
+        ② B → A : r_B ‖ MAC_K(r_B ‖ r_A ‖ ID_A)  <span class="cm">(‖=birlashtirish, ID_A=Alisa ismi)</span><br>
+        ③ A → B : MAC_K(r_A ‖ r_B ‖ ID_B)  <span class="cm">(ID_B=Bob ismi)</span><br><br>
+        Tekshirish: Alisa MAC_B ni, Bob MAC_A ni tekshiradi.
+      </div>
+      <p><strong>Himoya:</strong> ID_A, ID_B MAC-ga kiritiladi → reflection hujum bloklanadi.</p>
+    </div>
+  </div>
+
+  <!-- 4. Needham-Schroeder -->
+  <div class="card">
+    <div class="card-title card-collapse" onclick="toggleCard(this)">
+      <span class="collapse-ico">▼</span>
+      <div class="ct-icon ct-purple">4</div>
+      Needham-Schroeder va KDC
+    </div>
+    <div class="card-body">
+      <p><span class="term-tooltip" data-tip="Key Distribution Center — kalit taqsimlash markazi">KDC</span> orqali. 5 ta xabar. Lowe hujumi (1995) — tuzatish: NSL da ID_B qo'shiladi.</p>
+      <div class="math-block">
+        <button class="copy-btn" onclick="copyMath(this)" title="Nusxa olish">📋</button>
+        ① A → KDC : ID_A ‖ ID_B ‖ r_A  <span class="cm">(KDC=kalit markazi)</span><br>
+        ② KDC → A : E_K_A(K_S ‖ ... ‖ E_K_B(K_S ‖ ID_A))  <span class="cm">(E=shifrlash, K_S=sessiya kaliti)</span><br>
+        ③ A → B : E_K_B(K_S ‖ ID_A ‖ ID_B)  <span class="cm">← NSL tuzatmasi</span><br>
+        ④ B → A : E_K_S(r_B)  <span class="cm">(r_B=Bob nonce)</span><br>
+        ⑤ A → B : E_K_S(r_B - 1)  <span class="cm">(Alisa tasdiqi)</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. Kerberos -->
+  <div class="card">
+    <div class="card-title card-collapse" onclick="toggleCard(this)">
+      <span class="collapse-ico">▼</span>
+      <div class="ct-icon ct-amber">5</div>
+      Kerberos v5
+    </div>
+    <div class="card-body">
+      <p>AS + TGS. Timestamp ±5 daqiqa replay himoyasi. TGT → Service Ticket → Xizmat.</p>
+      <div class="math-block">
+        <button class="copy-btn" onclick="copyMath(this)" title="Nusxa olish">📋</button>
+        C → AS : ID_C ‖ ID_TGS ‖ T_S  <span class="cm">(C=mijoz, T_S=vaqt)</span><br>
+        AS → C : E_K_C(K_C,TGS) ‖ TGT  <span class="cm">(TGT=bilet)</span><br>
+        C → TGS : ID_S ‖ TGT ‖ Auth  <span class="cm">(Auth=autentifikator)</span><br>
+        TGS → C : E_K_C,TGS(K_C,S) ‖ Ticket_S  <span class="cm">(Ticket_S=xizmat bileti)</span><br>
+        C → S : Ticket_S ‖ Auth_2<br>
+        S → C : E_K_C,S(T_C+1)  <span class="cm">← o'zaro tasdiq</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. STS -->
+  <div class="card">
+    <div class="card-title card-collapse" onclick="toggleCard(this)">
+      <span class="collapse-ico">▼</span>
+      <div class="ct-icon ct-cyan">6</div>
+      STS (Station-to-Station)
+    </div>
+    <div class="card-body">
+      <p>DH + raqamli imzo. KDC kerak emas. <strong>Forward Secrecy</strong> — har sessiyada yangi x,y.</p>
+      <div class="math-block">
+        <button class="copy-btn" onclick="copyMath(this)" title="Nusxa olish">📋</button>
+        ① A → B : g^x mod p  <span class="cm">(x=sir son, p=tub son)</span><br>
+        ② B → A : g^y ‖ E_K(Sign_sk_B(g^y ‖ g^x))  <span class="cm">(sk_B=Bob xususiy kalit, K=g^xy)</span><br>
+        ③ A → B : E_K(Sign_sk_A(g^x ‖ g^y))  <span class="cm">(sk_A=Alisa xususiy kalit)</span><br>
+        K = g^xy mod p — sessiya kaliti
+      </div>
+    </div>
+  </div>
+
+  <!-- 7. Hujumlar -->
+  <div class="card">
+    <div class="card-title card-collapse" onclick="toggleCard(this)">
+      <span class="collapse-ico">▼</span>
+      <div class="ct-icon ct-red">7</div>
+      Hujumlar va himoya
+    </div>
+    <div class="card-body">
+      <table class="ctbl">
+        <tr><th>Hujum</th><th>Himoya</th></tr>
+        <tr><td>Replay</td><td>Nonce har sessiyada</td></tr>
+        <tr><td>Reflection</td><td>ID_A, ID_B MAC-ga</td></tr>
+        <tr><td>Lowe</td><td>NSL — ID_B qo'shish</td></tr>
+        <tr><td>MITM</td><td>STS imzo, PKI</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- Bo'sh joylar — qo'shimcha eslatmalar -->
+  <div class="card" style="border-style:dashed;border-color:var(--border)">
+    <div class="card-title"><div class="ct-icon ct-blue">✏️</div>Xulosa va qo'shimcha eslatmalar</div>
+    <p style="color:var(--text3);font-size:14px">Quyidagi joyga qo'shimcha eslatmalar yozing:</p>
+    <div contenteditable="true" class="notes-editable" style="min-height:120px;margin-top:12px;padding:16px;background:var(--bg0);border:1px dashed var(--border);border-radius:8px;font-size:14px;line-height:1.8;outline:none"
+      data-placeholder="Bu yerga o'z xulosangizni yozing..."
+    ></div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════
+     SEC 3: PROTOKOLLAR
+═══════════════════════════════════════════════════ -->
+<section class="section" id="protocols">
+  <div class="sec-header">
+    <div>
+      <div class="sec-num">MODUL 03</div>
+      <div class="sec-title">Protokollar Tavsifi</div>
+      <div class="sec-desc">ISO/IEC 9798, Needham-Schroeder, Kerberos, STS — har biri batafsil</div>
+    </div>
+  </div>
+
+  <div class="sub-tabs">
+    <button class="sub-tab active" onclick="showProto('iso',this)">ISO/IEC 9798-2</button>
+    <button class="sub-tab" onclick="showProto('ns',this)">Needham-Schroeder</button>
+    <button class="sub-tab" onclick="showProto('kerberos',this)">Kerberos</button>
+    <button class="sub-tab" onclick="showProto('sts',this)">STS (Station-to-Station)</button>
+  </div>
+
+  <!-- ISO 9798 -->
+  <div class="sub-content active" id="proto-iso">
+    <div class="card">
+      <div class="card-title"><div class="ct-icon ct-blue">📋</div>ISO/IEC 9798-2 — Simmetrik Kalit, 3-xabar</div>
+      <p>Eng sodda va keng tarqalgan o'zaro autentifikatsiya standarti. Simmetrik kalit <span class="inline-m">K_{AB}</span> — oldindan kelishib olingan:</p>
+
+      <div class="proto-wrap" style="margin-top:16px">
+        <div class="proto-diag two">
+          <div class="actor alice-a">
+            <div class="a-ico">👩</div>
+            <div class="a-name">Alisa (A)</div>
+            <div class="a-role">K_{AB} biladi</div>
+          </div>
+          <div class="msg-col">
+            <div class="msg to-right">
+              <span class="m-arr">→</span>
+              <span class="m-code">r_A</span>
+              <span class="m-desc">① Alisa nonce yuboradi</span>
+            </div>
+            <div class="msg to-left">
+              <span class="m-arr">←</span>
+              <span class="m-code">r_B ‖ MAC(K, r_B‖r_A‖ID_A)</span>
+              <span class="m-desc">② Bob: nonce + MAC</span>
+            </div>
+            <div class="msg to-right">
+              <span class="m-arr">→</span>
+              <span class="m-code">MAC(K, r_A‖r_B‖ID_B)</span>
+              <span class="m-desc">③ Alisa: MAC javob</span>
+            </div>
+          </div>
+          <div class="actor bob-a">
+            <div class="a-ico">👨</div>
+            <div class="a-name">Bob (B)</div>
+            <div class="a-role">K_{AB} biladi</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="math" style="margin-top:16px">
+        <span class="cm">// Alisa xabari ① :</span>
+        A → B :  r_A  <span class="cm">← r_A: Alisa nonce (tasodifiy son)</span><br><br>
+        <span class="cm">// Bob xabari ② :</span>
+        B → A :  r_B ‖ MAC<sub>K</sub>(r_B ‖ r_A ‖ ID_A)<br>
+        <span class="cm">↑ ‖ birlashtirish; MAC_K = K bilan imzo; ID_A = Alisa identifikatori</span><br><br>
+        <span class="cm">// Alisa tekshiradi ② :</span>
+        Alisa: MAC tekshirildi — mos keladimi?  <span class="ok">→ Bob tasdiqlandi ✓</span><br><br>
+        <span class="cm">// Alisa xabari ③ :</span>
+        A → B :  MAC<sub>K</sub>(r_A ‖ r_B ‖ ID_B)  <span class="cm">← ID_B = Bob identifikatori</span><br><br>
+        <span class="cm">// Bob tekshiradi ③ :</span>
+        Bob: MAC tekshirildi — mos keladimi?  <span class="ok">→ Alisa tasdiqlandi ✓</span>
+      </div>
+
+      <div class="box ok">✅ <strong>Nima uchun xavfsiz?</strong> r_A va r_B ikkisi ham MACga kiritiladi. Eva eski xabarni qayta yuborsa, Bob yangi r_B beradi → eski MAC mos kelmaydi. Kalitni bilmasa, yangi MAC hisoblab bo'lmaydi.</div>
+    </div>
+  </div>
+
+  <!-- Needham-Schroeder -->
+  <div class="sub-content" id="proto-ns">
+    <div class="card">
+      <div class="card-title"><div class="ct-icon ct-purple">🏛️</div>Needham-Schroeder Protokoli (1978)</div>
+      <p>Birinchi rasmiy o'zaro autentifikatsiya protokoli. <strong>KDC (Key Distribution Center)</strong> — ishonchli uchinchi tomon orqali ishlaydi:</p>
+
+      <div class="proto-wrap" style="margin-top:16px">
+        <div class="proto-diag three">
+          <div class="actor alice-a">
+            <div class="a-ico">👩</div>
+            <div class="a-name">Alisa</div>
+            <div class="a-role">K_A biladi</div>
+          </div>
+          <div class="msg-col">
+            <div class="msg to-right"><span class="m-arr">→</span><span class="m-code">ID_A, ID_B, r_A</span><span class="m-desc">① KDC ga so'rov</span></div>
+            <div class="msg to-left"><span class="m-arr">←</span><span class="m-code">E_{K_A}(K_S, ID_B, r_A, T_B)</span><span class="m-desc">② Sessiya kalit + ticket</span></div>
+            <div class="msg to-right"><span class="m-arr">→</span><span class="m-code">T_B = E_{K_B}(K_S, ID_A)</span><span class="m-desc">③ Bob uchun ticket</span></div>
+            <div class="msg to-left"><span class="m-arr">←</span><span class="m-code">E_{K_S}(r_B)</span><span class="m-desc">④ Bob nonce</span></div>
+            <div class="msg to-right"><span class="m-arr">→</span><span class="m-code">E_{K_S}(r_B - 1)</span><span class="m-desc">⑤ Alisa javobi</span></div>
+          </div>
+          <div class="actor trent-a">
+            <div class="a-ico">🏛️</div>
+            <div class="a-name">KDC</div>
+            <div class="a-role">K_A, K_B biladi</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="math" style="margin-top:16px">
+        <span class="cm">// Izoh: E_K = K bilan shifrlash; K_S = sessiya kaliti; ID_A/ID_B = identifikatorlar</span><br>
+        ① A → KDC : ID_A ‖ ID_B ‖ r_A  <span class="cm">← Alisa kim bilan aloqa qilmoqchi</span><br>
+        ② KDC → A : E<sub>K_A</sub>(K_S ‖ ID_B ‖ r_A ‖ E<sub>K_B</sub>(K_S ‖ ID_A))<br>
+        <span class="cm">↑ K_S — yangi sessiya kaliti; E_K_B(...) — Bob uchun ticket (bilet)</span><br>
+        ③ A → B : E<sub>K_B</sub>(K_S ‖ ID_A)  <span class="cm">← ticket: faqat Bob ocha oladi</span><br>
+        ④ B → A : E<sub>K_S</sub>(r_B)  <span class="cm">← Bob nonce, K_S bilan shifrlangan</span><br>
+        ⑤ A → B : E<sub>K_S</sub>(r_B - 1)  <span class="cm">← Alisa r_B ni qaytardi (tasdiq)</span>
+      </div>
+
+      <div class="box warn">⚠️ <strong>Lowe hujumi (1995):</strong> Eva eski sessiya kalitini qayta ishlatib, Bobni aldashi mumkin! Bu kamchilikni Lowe topdi va protokol NSL (Needham-Schroeder-Lowe) versiyasida tuzatildi.</div>
+
+      <div class="math">
+        <span class="cm">// NSL tuzatmasi — ③-xabarga ID_B qo'shildi:</span><br>
+        ③ A → B : E<sub>K_B</sub>(K_S ‖ ID_A ‖ ID_B)  <span class="ok">← Lowe tuzatmasi</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Kerberos -->
+  <div class="sub-content" id="proto-kerberos">
+    <div class="card">
+      <div class="card-title"><div class="ct-icon ct-amber">🐕</div>Kerberos v5 — KDC Asosida Amaliy Protokol</div>
+      <p>MIT tomonidan ishlab chiqilgan. Timestamp asosida replay himoyasi. Windows Active Directory standart protokoli:</p>
+
+      <div class="math">
+        <span class="cm">// Izoh: C=mijoz, S=xizmat, AS=autentifikatsiya serveri, TGS=bilet beruvchi</span><br>
+        <span class="cm">// TGT=bilet, Auth=autentifikator, T_S/T_C=timestamp (vaqt)</span><br><br>
+        <span class="cm">// 1-bosqich: TGT olish (AS bilan)</span><br>
+        <span class="alice">C</span> → AS : ID_C ‖ ID_TGS ‖ T_S  <span class="cm">← mijoz, TGS, vaqt</span><br>
+        AS → <span class="alice">C</span> : E<sub>K_C</sub>(K_{C,TGS}) ‖ TGT  <span class="cm">← sessiya kaliti + TGT bilet</span><br><br>
+        <span class="cm">// 2-bosqich: Xizmat bileti olish (TGS bilan)</span><br>
+        <span class="alice">C</span> → TGS : ID_S ‖ TGT ‖ Auth  <span class="cm">← qaysi xizmat, TGT, Auth</span><br>
+        TGS → <span class="alice">C</span> : E<sub>K_{C,TGS}</sub>(K_{C,S}) ‖ Ticket_S  <span class="cm">← xizmat sessiya kaliti + bilet</span><br><br>
+        <span class="cm">// 3-bosqich: Xizmatga kirish</span><br>
+        <span class="alice">C</span> → S : Ticket_S ‖ Auth_2<br>
+        S → <span class="alice">C</span> : E<sub>K_{C,S}</sub>(T_C + 1)  <span class="ok">← o'zaro tasdiq (S ham o'zini isbotladi)</span>
+      </div>
+
+      <div class="info-grid">
+        <div class="info-item"><div class="ii-label">Replay himoyasi</div><div class="ii-value">Timestamp ± 5 daqiqa</div></div>
+        <div class="info-item"><div class="ii-label">Bilet muddati</div><div class="ii-value">Default 10 soat</div></div>
+        <div class="info-item"><div class="ii-label">Shifrlash</div><div class="ii-value">AES-256 (v5)</div></div>
+        <div class="info-item"><div class="ii-label">Port</div><div class="ii-value">UDP/TCP 88</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STS -->
+  <div class="sub-content" id="proto-sts">
+    <div class="card">
+      <div class="card-title"><div class="ct-icon ct-cyan">⚡</div>STS (Station-to-Station) Protokoli</div>
+      <p>DH kalit almashinuvini raqamli imzo bilan birlashtiradi. KDC siz ishlaydi, <strong>Forward Secrecy</strong> ta'minlaydi:</p>
+
+      <div class="proto-wrap">
+        <div class="proto-diag two">
+          <div class="actor alice-a">
+            <div class="a-ico">👩</div>
+            <div class="a-name">Alisa</div>
+            <div class="a-role">sk_A, pk_A (xususiy va ochiq kalit)</div>
+          </div>
+          <div class="msg-col">
+            <div class="msg to-right"><span class="m-arr">→</span><span class="m-code">g^x mod p</span><span class="m-desc">① DH qism</span></div>
+            <div class="msg to-left"><span class="m-arr">←</span><span class="m-code">g^y, E_K(σ_B)</span><span class="m-desc">② DH + imzo</span></div>
+            <div class="msg to-right"><span class="m-arr">→</span><span class="m-code">E_K(σ_A)</span><span class="m-desc">③ Alisa imzosi</span></div>
+          </div>
+          <div class="actor bob-a">
+            <div class="a-ico">👨</div>
+            <div class="a-name">Bob</div>
+            <div class="a-role">sk_B, pk_B (xususiy va ochiq kalit)</div>
+          </div>
+        </div>
+      </div>
+
+      <p style="margin-top:12px"><strong>Qisqacha:</strong> Alisa va Bob har biri sir son (x, y) tanlaydi. g<sup>x</sup> va g<sup>y</sup> almashadi. Ikkalasi ham bir xil K = g<sup>xy</sup> ni hisoblaydi. Imzolar MITM hujumini bloklaydi.</p>
+      <div class="math" style="margin-top:16px">
+        <span class="cm">// Izoh: g^x = g sonning x darajasi (mod p); x,y = sir sonlar; K = sessiya kaliti</span><br>
+        ① A → B : g<sup>x</sup>  <span class="cm">← Alisa sir son x tanladi, g^x ochiq yuboradi</span><br>
+        ② B → A : g<sup>y</sup> + imzo σ_B  <span class="cm">← Bob g^y + imzo; K = g^xy ikkalasida ham bir xil</span><br>
+        ③ A → B : imzo σ_A  <span class="cm">← Alisa imzosi</span><br><br>
+        <span class="cm">Tekshirish:</span> Har tomon sherigining imzosini tekshiradi (Verify) → ikkalasi tasdiqlanadi
+      </div>
+
+      <div class="box ok">✅ <strong>Forward Secrecy:</strong> Har sessiyada yangi x va y tanlangan — eski sessiya kalitlarini hech kim tiklay olmaydi, hatto xususiy kalitlar keyinroq fosh bo'lsa ham.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════
+     SEC 4: LABORATORIYA
+═══════════════════════════════════════════════════ -->
+<section class="section" id="lab">
+  <div class="sec-header">
+    <div>
+      <div class="sec-num">MODUL 04</div>
+      <div class="sec-title">Interaktiv Laboratoriya</div>
+      <div class="sec-desc">Haqiqiy hisob-kitoblar bilan protokollarni bosqichma-bosqich bajarish</div>
+    </div>
+  </div>
+
+  <!-- LAB 1: ISO 9798 -->
+  <div class="lab-panel">
+    <div class="lab-header">
+      <div class="lab-title">
+        <div class="lab-dots">
+          <div class="lab-dot r"></div>
+          <div class="lab-dot y"></div>
+          <div class="lab-dot g"></div>
+        </div>
+        LAB-01 · ISO/IEC 9798-2 Simulyator
+      </div>
+      <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text3)">3-xabarli o'zaro autentifikatsiya</span>
+    </div>
+    <div class="lab-body">
+      <div class="input-grid">
+        <div class="input-group">
+          <label>Alisa identifikatori</label>
+          <input type="text" id="l1_idA" value="alice@lab.uz">
+        </div>
+        <div class="input-group">
+          <label>Bob identifikatori</label>
+          <input type="text" id="l1_idB" value="bob@lab.uz">
+        </div>
+        <div class="input-group">
+          <label>Umumiy maxfiy kalit K</label>
+          <input type="text" id="l1_key" value="SecretKey_2024_Lab">
+        </div>
+        <div class="input-group">
+          <label>Ssenariy</label>
+          <select id="l1_scenario">
+            <option value="normal">Normal (muvaffaqiyatli)</option>
+            <option value="replay">Replay hujumi simulyatsiyasi</option>
+            <option value="wrongkey">Noto'g'ri kalit (Bob)</option>
+            <option value="mitm">MITM simulyatsiyasi</option>
+          </select>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn primary" onclick="runLab1()"><span class="bi">▶</span> Protokolni Ishga Tushirish</button>
+        <button class="btn step-btn" onclick="stepLab1()"><span class="bi">⏭</span> Qadam-Qadam</button>
+        <button class="btn secondary" onclick="randomLab1()"><span class="bi">🎲</span> Tasodifiy</button>
+        <button class="btn danger" onclick="resetLab1()"><span class="bi">↺</span> Tozalash</button>
+      </div>
+      <div id="lab1_out" style="display:none">
+        <div class="result-grid" id="lab1_grid"></div>
+        <div class="terminal" id="lab1_log"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Interaktiv: Protokol tartibi -->
+  <div class="card">
+    <div class="card-title"><div class="ct-icon ct-purple">🧩</div>Protokol qadamlari tartibini to'g'rilang</div>
+    <p style="margin-bottom:12px;font-size:14px;color:var(--text2)">Quyidagi qadamlarni ISO 9798-2 protokoliga mos tartibga keltiring (sürg'lab tashlang):</p>
+    <div id="protocolOrderWrap" class="order-wrap">
+      <div class="order-item" draggable="true" data-idx="0" data-step="r_B ‖ MAC_B qaytariladi"><span class="order-num">1</span><span>r_B ‖ MAC_B qaytariladi</span></div>
+      <div class="order-item" draggable="true" data-idx="1" data-step="r_A yuboriladi"><span class="order-num">2</span><span>r_A yuboriladi</span></div>
+      <div class="order-item" draggable="true" data-idx="2" data-step="MAC_A yuboriladi"><span class="order-num">3</span><span>MAC_A yuboriladi</span></div>
+    </div>
+    <div style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <button class="btn secondary" onclick="checkProtocolOrder()">Tekshirish</button>
+      <button class="btn secondary" onclick="shuffleProtocolOrder()">🔄 Aralashtirish</button>
+      <span id="orderFeedback" style="font-weight:600"></span>
+    </div>
+  </div>
+
+  <!-- Canvas animation -->
+  <div class="card">
+    <div class="card-title"><div class="ct-icon ct-cyan">🎬</div>Protokol Animatsiyasi</div>
+    <div class="canvas-wrap">
+      <canvas id="mainCanvas" height="300"></canvas>
+    </div>
+    <div class="btn-row" style="margin-top:14px;justify-content:center">
+      <button class="btn secondary" onclick="animISO()"><span class="bi">▶</span> ISO 9798 Animatsiya</button>
+      <button class="btn secondary" onclick="animReplay()"><span class="bi">⚡</span> Replay Hujumi</button>
+      <button class="btn secondary" onclick="animMITM()"><span class="bi">👿</span> MITM Hujumi</button>
+    </div>
+  </div>
+
+  <!-- LAB 2: Kerberos -->
+  <div class="lab-panel">
+    <div class="lab-header">
+      <div class="lab-title">
+        <div class="lab-dots">
+          <div class="lab-dot r"></div>
+          <div class="lab-dot y"></div>
+          <div class="lab-dot g"></div>
+        </div>
+        LAB-02 · Kerberos Simulyatori
+      </div>
+      <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text3)">KDC asosida autentifikatsiya</span>
+    </div>
+    <div class="lab-body">
+      <div class="input-grid">
+        <div class="input-group">
+          <label>Mijoz ismi</label>
+          <input type="text" id="k_client" value="alice">
+        </div>
+        <div class="input-group">
+          <label>Xizmat nomi</label>
+          <input type="text" id="k_service" value="fileserver">
+        </div>
+        <div class="input-group">
+          <label>Bilet muddati (soat)</label>
+          <input type="number" id="k_lifetime" value="8" min="1" max="24">
+        </div>
+        <div class="input-group">
+          <label>Timestamp farqi (daqiqa)</label>
+          <select id="k_skew">
+            <option value="0">0 daqiqa (normal)</option>
+            <option value="3">3 daqiqa (qabul qilinadi)</option>
+            <option value="6">6 daqiqa (rad etiladi!)</option>
+          </select>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn primary" onclick="runKerberos()"><span class="bi">🐕</span> Kerberos Autentifikatsiya</button>
+        <button class="btn danger" onclick="resetKerberos()"><span class="bi">↺</span> Tozalash</button>
+      </div>
+      <div id="kerb_out" style="display:none">
+        <div class="terminal" id="kerb_log"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LAB 3: STS -->
+  <div class="lab-panel">
+    <div class="lab-header">
+      <div class="lab-title">
+        <div class="lab-dots">
+          <div class="lab-dot r"></div>
+          <div class="lab-dot y"></div>
+          <div class="lab-dot g"></div>
+        </div>
+        LAB-03 · STS Protokol Simulyatori
+      </div>
+      <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text3)">DH + Raqamli imzo</span>
+    </div>
+    <div class="lab-body">
+      <div class="input-grid">
+        <div class="input-group">
+          <label>p (tub son)</label>
+          <input type="number" id="sts_p" value="23">
+        </div>
+        <div class="input-group">
+          <label>g (generator)</label>
+          <input type="number" id="sts_g" value="5">
+        </div>
+        <div class="input-group">
+          <label>Alisa x (sir)</label>
+          <input type="number" id="sts_x" value="6" min="2">
+        </div>
+        <div class="input-group">
+          <label>Bob y (sir)</label>
+          <input type="number" id="sts_y" value="11" min="2">
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn primary" onclick="runSTS()"><span class="bi">⚡</span> STS Protokolini Bajarish</button>
+        <button class="btn secondary" onclick="randomSTS()"><span class="bi">🎲</span> Tasodifiy</button>
+      </div>
+      <div id="sts_out" style="display:none">
+        <div class="result-grid" id="sts_grid"></div>
+        <div class="terminal" id="sts_log"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════
+     SEC 5: HUJUMLAR
+═══════════════════════════════════════════════════ -->
+<section class="section" id="attacks">
+  <div class="sec-header">
+    <div>
+      <div class="sec-num">MODUL 05</div>
+      <div class="sec-title">Hujumlar va Himoya</div>
+      <div class="sec-desc">Replay, MITM, Lowe hujumi, Reflection attack va ulardan himoya</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><div class="ct-icon ct-red">🔁</div>Reflection Attack (Aks hujum)</div>
+    <p>O'zaro autentifikatsiya protokolida <strong>nonce-lar to'g'ri birlashtirilmasa</strong> Eva sheriga o'z savoliga o'zi javob berdirib tasdiqlata olishi mumkin:</p>
+
+    <div class="math">
+      <span class="cm">// Zaif protokol (noto'g'ri):</span><br>
+      ① A → B : r_A  <span class="cm">(r_A=Alisa nonce)</span><br>
+      ② B → A : r_B ‖ MAC(K, r_A)  <span class="cm">← Bob isboti; zaif: ID yo'q!</span><br>
+      ③ A → B : MAC(K, r_B)  <span class="cm">← Alisa isboti</span><br><br>
+      <span class="bad">// Reflection hujum — Eva Alisa o'rnida:</span><br>
+      Eva → Bob : r_1<br>
+      Bob → Eva : r_2 ‖ MAC(K, r_1)<br>
+      Eva <span style="color:var(--red)">ikkinchi kanal ochadi →</span> Bob : r_2<br>
+      Bob → Eva : r_3 ‖ MAC(K, r_2)<br>
+      Eva → Bob : MAC(K, r_2)  <span class="bad">← Bobdan oldi!</span><br>
+      <span class="ok">ISO 9798-2 himoyasi: ID_A va ID_B MAC ichiga kiritiladi</span>
+    </div>
+
+    <div class="box ok">✅ <strong>Himoya:</strong> <span class="inline-m">MAC(K, r_B ‖ r_A ‖ ID_A)</span> — ID_A (Alisa ismi) va ID_B (Bob ismi) ni qo'shish reflection hujumini bloklab qo'yadi, chunki Eva ularni almashtirib qo'ya olmaydi.</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><div class="ct-icon ct-red">🎭</div>Lowe Hujumi (Needham-Schroeder ga)</div>
+    <div class="math">
+      <span class="cm">// Original NS (zaif) — Eva server sifatida:</span><br>
+      <span class="cm">// E_K=shifrlash, K_S=sessiya kaliti, ID_A=Alisa identifikatori</span><br>
+      ① A → Eva : E<sub>K_B</sub>(K_S ‖ ID_A)  <span class="cm">← Alisa Evani Bob deb o'ylaydi</span><br>
+      Eva → B  : E<sub>K_B</sub>(K_S ‖ ID_A)   <span class="cm">← ticket ni Bob ga uzatadi</span><br>
+      Bob → Eva : E<sub>K_S</sub>(r_B)<br>
+      Eva → A  : E<sub>K_S</sub>(r_B)<br>
+      A → Eva : E<sub>K_S</sub>(r_B - 1)<br>
+      Eva → B : E<sub>K_S</sub>(r_B - 1)<br>
+      <span class="bad">// Natija: Bob Alisa bilan ishlayapman deb o'ylaydi, aslida Eva bilan!</span><br><br>
+      <span class="ok">// NSL tuzatmasi:</span><br>
+      B → A : E<sub>K_S</sub>(r_B ‖ ID_B)  <span class="ok">← ID_B qo'shildi → Lowe hujumi bloklandi</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><div class="ct-icon ct-red">👿</div>MITM Hujumi va STS himoyasi</div>
+    <div class="atk-grid">
+      <div class="atk-box alice-atk">
+        <div class="aico">👩</div>
+        <div class="anm">Alisa</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:4px;font-family:'DM Mono',monospace">DH: g^x mod p</div>
+      </div>
+      <div class="atk-conn">
+        → g^x →<br>
+        ← g^z ←<br>
+        <span style="color:var(--eve);font-size:10px">Eva ushlab oldi!</span>
+      </div>
+      <div class="atk-box eve-atk">
+        <div class="aico">😈</div>
+        <div class="anm">Eva</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:4px;font-family:'DM Mono',monospace">z tasodifiy</div>
+      </div>
+      <div class="atk-conn">
+        → g^z →<br>
+        ← g^y ←<br>
+        <span style="color:var(--eve);font-size:10px">Eva uzatdi!</span>
+      </div>
+      <div class="atk-box bob-atk">
+        <div class="aico">👨</div>
+        <div class="anm">Bob</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:4px;font-family:'DM Mono',monospace">DH: g^y mod p</div>
+      </div>
+    </div>
+    <div class="math">
+      <span class="bad">// Sof DH — MITM ga zaif:</span><br>
+      Eva o'rtada: Alisa bilan bir kalit, Bob bilan boshqa kalit yaratadi.<br>
+      Natijada Eva ikkala xabarni ham o'qiy va o'zgartirishi mumkin!<br><br>
+      <span class="ok">// STS himoya — imzo qo'shiladi:</span><br>
+      Bob imzosi faqat g^y va g^x uchun to'g'ri. Eva g^x ni o'z g^z bilan almashtirsa,<br>
+      imzo mos kelmaydi → Alisa "Bu Bob emas!" deb aniqlaydi → hujum bloklanadi!
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><div class="ct-icon ct-amber">📊</div>Hujumlar Xulosasi</div>
+    <table class="ctbl">
+      <tr><th>Hujum</th><th>Ta'sir</th><th>Zaif protokol</th><th>Himoya</th></tr>
+      <tr>
+        <td>Replay Attack</td><td>Eski sessiyani qayta ishlatish</td>
+        <td><span class="td-bad">Nonce yo'q protokollar</span></td>
+        <td><span class="td-ok">Yangi nonce har sessiyada</span></td>
+      </tr>
+      <tr>
+        <td>Reflection Attack</td><td>Bob o'z savoliga javob beradi</td>
+        <td><span class="td-bad">ID kiritilmagan MAC</span></td>
+        <td><span class="td-ok">ID_A, ID_B MAC-ga</span></td>
+      </tr>
+      <tr>
+        <td>Lowe Hujumi</td><td>Noto'g'ri identifikatsiya</td>
+        <td><span class="td-bad">Original NS protokoli</span></td>
+        <td><span class="td-ok">NSL — ID_B qo'shish</span></td>
+      </tr>
+      <tr>
+        <td>MITM</td><td>Oradagi odam</td>
+        <td><span class="td-bad">Sof DH, autentifikatsiyasiz</span></td>
+        <td><span class="td-ok">STS, PKI sertifikatlari</span></td>
+      </tr>
+      <tr>
+        <td>KDC Kompromis</td><td>Barcha kalitlar fosh</td>
+        <td><span class="td-bad">Kerberos, NS</span></td>
+        <td><span class="td-ok">STS — KDC siz ishlaydi</span></td>
+      </tr>
+    </table>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════
+     SEC 6: TAQQOSLASH
+═══════════════════════════════════════════════════ -->
+<section class="section" id="compare">
+  <div class="sec-header">
+    <div>
+      <div class="sec-num">MODUL 06</div>
+      <div class="sec-title">Protokollar Taqqoslash</div>
+      <div class="sec-desc">To'liq xususiyat va afzalliklar tahlili</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <table class="ctbl">
+      <tr>
+        <th>Xususiyat</th>
+        <th>ISO 9798-2</th>
+        <th>Needham-Schroeder</th>
+        <th>Kerberos v5</th>
+        <th>STS</th>
+      </tr>
+      <tr>
+        <td><strong>Kalit turi</strong></td>
+        <td>Simmetrik K_{AB}</td>
+        <td>Simmetrik (KDC)</td>
+        <td>Simmetrik (KDC)</td>
+        <td>Asimmetrik (imzo)</td>
+      </tr>
+      <tr>
+        <td><strong>Uchinchi tomon</strong></td>
+        <td><span class="td-ok">Shart emas</span></td>
+        <td><span class="td-bad">KDC kerak</span></td>
+        <td><span class="td-bad">AS+TGS kerak</span></td>
+        <td><span class="td-ok">Shart emas</span></td>
+      </tr>
+      <tr>
+        <td><strong>Xabar soni</strong></td>
+        <td>3</td>
+        <td>5</td>
+        <td>6+</td>
+        <td>3</td>
+      </tr>
+      <tr>
+        <td><strong>Replay himoya</strong></td>
+        <td><span class="td-ok">Nonce (2x)</span></td>
+        <td><span class="td-mid">Nonce</span></td>
+        <td><span class="td-ok">Timestamp ±5 min</span></td>
+        <td><span class="td-ok">DH yangilanadi</span></td>
+      </tr>
+      <tr>
+        <td><strong>Forward Secrecy</strong></td>
+        <td><span class="td-bad">Yo'q</span></td>
+        <td><span class="td-bad">Yo'q</span></td>
+        <td><span class="td-bad">Yo'q</span></td>
+        <td><span class="td-ok">Ha (DHE)</span></td>
+      </tr>
+      <tr>
+        <td><strong>MITM himoya</strong></td>
+        <td><span class="td-mid">K to'g'ri bo'lsa</span></td>
+        <td><span class="td-mid">KDC orqali</span></td>
+        <td><span class="td-ok">Kuchli</span></td>
+        <td><span class="td-ok">Imzo orqali</span></td>
+      </tr>
+      <tr>
+        <td><strong>KDC kompromisi</strong></td>
+        <td><span class="td-ok">Ta'sir etmaydi</span></td>
+        <td><span class="td-bad">Barcha kalitlar fosh</span></td>
+        <td><span class="td-bad">Barcha kalitlar fosh</span></td>
+        <td><span class="td-ok">Ta'sir etmaydi</span></td>
+      </tr>
+      <tr>
+        <td><strong>Samaradorlik</strong></td>
+        <td><span class="td-ok">Yuqori (HMAC)</span></td>
+        <td><span class="td-mid">O'rtacha</span></td>
+        <td><span class="td-mid">O'rtacha</span></td>
+        <td><span class="td-bad">Past (RSA/ECDSA)</span></td>
+      </tr>
+      <tr>
+        <td><strong>Amaliy misol</strong></td>
+        <td>IoT, embedded</td>
+        <td>Tarixiy</td>
+        <td>Active Directory</td>
+        <td>TLS 1.3, SSH</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><div class="ct-icon ct-green">💡</div>Qaysi protokolni tanlash kerak?</div>
+    <div class="info-grid">
+      <div class="info-item">
+        <div class="ii-label">Korporativ tarmoq</div>
+        <div class="ii-value" style="color:var(--amber)">Kerberos v5</div>
+      </div>
+      <div class="info-item">
+        <div class="ii-label">Internet protokoli</div>
+        <div class="ii-value" style="color:var(--cyan)">STS (TLS 1.3)</div>
+      </div>
+      <div class="info-item">
+        <div class="ii-label">IoT / Embedded</div>
+        <div class="ii-value" style="color:var(--blue)">ISO 9798-2</div>
+      </div>
+      <div class="info-item">
+        <div class="ii-label">O'rganish/Ta'lim</div>
+        <div class="ii-value" style="color:var(--green)">ISO 9798-2</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════
+     SEC 7: QUIZ
+═══════════════════════════════════════════════════ -->
+<section class="section" id="quiz">
+  <div class="sec-header">
+    <div>
+      <div class="sec-num">MODUL 07</div>
+      <div class="sec-title">Bilimlarni Tekshirish</div>
+      <div class="sec-desc">8 ta savol — o'zaro autentifikatsiya protokollarini tekshirish</div>
+    </div>
+  </div>
+  <div id="qWrap">
+    <div class="prog-bar"><div class="prog-fill" id="qProg" style="width:0%"></div></div>
+    <div class="card" id="qCard"></div>
+  </div>
+  <div id="qScore" style="display:none" class="score-panel">
+    <div class="score-num" id="sNum">0/8</div>
+    <div style="font-size:1.3rem;font-weight:700;margin:10px 0" id="sMsg"></div>
+    <p style="color:var(--text2);margin-bottom:24px" id="sDet"></p>
+    <button class="btn primary" onclick="restartQuiz()">🔄 Qayta Boshlash</button>
+  </div>
+</section>
+
+</main>
+
+<!-- ═══════════════════════════════════════════════════
+     JAVASCRIPT
+═══════════════════════════════════════════════════ -->
+<script>
+/* ─────────────────────────────────────
+   THEME
+───────────────────────────────────── */
+function toggleTheme(){
+  const h = document.documentElement;
+  const isDark = h.getAttribute('data-theme') === 'dark';
+  h.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  document.getElementById('themeLabel').textContent = isDark ? 'LIGHT' : 'DARK';
+  redrawCanvas();
+}
+
+/* ─────────────────────────────────────
+   NAVIGATION
+───────────────────────────────────── */
+const SEC_IDS=['intro','theory','notes','protocols','lab','attacks','compare','quiz'];
+function showSec(id){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.ntab').forEach(b=>b.classList.remove('active'));
+  const el=document.getElementById(id);
+  if(el) el.classList.add('active');
+  const idx=SEC_IDS.indexOf(id);
+  if(idx>=0) document.querySelectorAll('.ntab')[idx].classList.add('active');
+  if(id==='lab') setTimeout(()=>drawCanvas(),120);
+}
+function toggleCard(el){ el.classList.toggle('collapsed'); }
+function expandAllNotes(){ document.querySelectorAll('#notes .card-collapse').forEach(c=>c.classList.remove('collapsed')); }
+function collapseAllNotes(){ document.querySelectorAll('#notes .card-collapse').forEach(c=>c.classList.add('collapsed')); }
+function copyMath(btn){
+  const block=btn.closest('.math-block');
+  const clone=block?.cloneNode(true);
+  clone?.querySelector('.copy-btn')?.remove();
+  const text=(clone?.innerText||'').replace(/\s+/g,' ').trim();
+  navigator.clipboard?.writeText(text).then(()=>{
+    btn.textContent='✓'; btn.classList.add('copied');
+    setTimeout(()=>{ btn.textContent='📋'; btn.classList.remove('copied'); },1500);
+  }).catch(()=>{});
+}
+
+/* ─────────────────────────────────────
+   PROTOCOL SUBTABS
+───────────────────────────────────── */
+function showProto(id,btn){
+  document.querySelectorAll('.sub-content').forEach(c=>c.classList.remove('active'));
+  document.querySelectorAll('.sub-tab').forEach(b=>b.classList.remove('active'));
+  document.getElementById('proto-'+id)?.classList.add('active');
+  if(btn) btn.classList.add('active');
+}
+
+/* ─────────────────────────────────────
+   CRYPTO UTILS (demo — not real HMAC)
+───────────────────────────────────── */
+function djb2(s){
+  let h=5381n;
+  for(let i=0;i<s.length;i++) h=((h*33n)+BigInt(s.charCodeAt(i)))&0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFn;
+  return h.toString(16).padStart(32,'0').substring(0,32);
+}
+function hmacDemo(key,msg){
+  const ipad=key.split('').map(c=>String.fromCharCode(c.charCodeAt(0)^0x36)).join('');
+  const opad=key.split('').map(c=>String.fromCharCode(c.charCodeAt(0)^0x5c)).join('');
+  return djb2(opad+djb2(ipad+msg));
+}
+function hex8(){ return [...Array(8)].map(()=>Math.floor(Math.random()*16).toString(16)).join(''); }
+function hex16(){ return hex8()+hex8(); }
+function rnd(a,b){return Math.floor(Math.random()*(b-a+1)+a);}
+function modpow(base,exp,mod){
+  let r=1n; base=BigInt(base)%BigInt(mod);
+  let e=BigInt(exp);
+  while(e>0n){if(e%2n===1n)r=r*base%BigInt(mod);e=e>>1n;base=base*base%BigInt(mod);}
+  return Number(r);
+}
+function isPrime(n){
+  if(n<2)return false;if(n<4)return true;
+  if(n%2===0||n%3===0)return false;
+  for(let i=5;i*i<=n;i+=6)if(n%i===0||n%(i+2)===0)return false;
+  return true;
+}
+
+/* ─────────────────────────────────────
+   LAB 1 — ISO/IEC 9798-2
+───────────────────────────────────── */
+let lab1Step=0, lab1State={};
+
+function resetLab1(){
+  lab1Step=0; lab1State={};
+  document.getElementById('lab1_out').style.display='none';
+}
+
+function randomLab1(){
+  const logins=['alice','bob','charlie','diana','eve_demo'];
+  document.getElementById('l1_idA').value=logins[rnd(0,2)]+'@'+['lab','uni','corp'][rnd(0,2)]+'.uz';
+  document.getElementById('l1_idB').value=logins[rnd(1,3)]+'@'+['lab','uni','corp'][rnd(0,2)]+'.uz';
+  document.getElementById('l1_key').value='K_'+hex8().toUpperCase();
+}
+
+function runLab1(){
+  const idA=document.getElementById('l1_idA').value;
+  const idB=document.getElementById('l1_idB').value;
+  const K=document.getElementById('l1_key').value;
+  const sc=document.getElementById('l1_scenario').value;
+
+  const rA=hex16(); const rB=hex16();
+  const mac_B=hmacDemo(K,rB+rA+idA);
+  const mac_A_correct=hmacDemo(K,rA+rB+idB);
+
+  let mac_A_sent=mac_A_correct;
+  let bobKey=K;
+  let eveNote='';
+  let mitmNote='';
+
+  if(sc==='replay'){
+    const rA_old=hex16();
+    const mac_B_old=hmacDemo(K,hex16()+rA_old+idA);
+    eveNote=`<br><span class="t-eve">⚡ [REPLAY]</span> Eva eski sessiyadan: MAC = ${mac_B_old.substring(0,16)}...<br>`;
+    eveNote+=`<span class="t-step">[NONCE]</span> Server yangi r_A = ${rA} kutmoqda<br>`;
+    eveNote+=`<span class="t-fail">[REJECT]</span> Eski MAC yangi r_A uchun mos emas → hujum muvaffaqiyatsiz!`;
+  } else if(sc==='wrongkey'){
+    bobKey=K+'_WRONG';
+    mac_A_sent=hmacDemo(bobKey,rA+rB+idB);
+    eveNote=`<span class="t-eve">⚡ [WRONGKEY]</span> Bob noto'g'ri K' ishlatmoqda<br>`;
+    eveNote+=`<span class="t-fail">[TEKSHIRISH]</span> Bob: MAC(K',r_A‖r_B) ≠ MAC(K,r_A‖r_B) → MUVAFFAQIYATSIZ`;
+  } else if(sc==='mitm'){
+    const rB_eve=hex16();
+    eveNote=`<span class="t-eve">👿 [MITM]</span> Eva Alisa va Bob o'rtasiga kirdi<br>`;
+    eveNote+=`<span class="t-eve">[MITM]</span> Eve Alisa bilan r_B'=${rB_eve.substring(0,8)}... nonce ishlatdi<br>`;
+    eveNote+=`<span class="t-warn">[HIMOYA]</span> STS protokolida imzo kerak → MITM aniqlandi!`;
+  }
+
+  const macBMatch=true; // Bob to'g'ri K ishlatdi
+  const macAMatch=(sc!=='wrongkey'&&sc!=='mitm');
+  const success=(sc==='normal');
+
+  const grid=document.getElementById('lab1_grid');
+  grid.innerHTML=`
+    <div class="result-card alice-r">
+      <h4>👩 Alisa</h4>
+      <div class="rr"><span class="rk">ID_A</span><span class="rv">${idA}</span></div>
+      <div class="rr"><span class="rk">r_A (nonce)</span><span class="rv">0x${rA.substring(0,12)}...</span></div>
+      <div class="rr"><span class="rk">MAC(K,r_A‖r_B‖ID_B)</span><span class="rv">${mac_A_correct.substring(0,14)}...</span></div>
+      <div class="rr"><span class="rk">Bob tasdiqlandi?</span><span class="rv ${sc==='normal'||sc==='wrongkey'?'ok':'fail'}">${sc!=='mitm'?'✓ Ha':'✗ Yo\'q (MITM)'}</span></div>
+    </div>
+    <div class="result-card bob-r">
+      <h4>👨 Bob</h4>
+      <div class="rr"><span class="rk">ID_B</span><span class="rv">${idB}</span></div>
+      <div class="rr"><span class="rk">r_B (nonce)</span><span class="rv">0x${rB.substring(0,12)}...</span></div>
+      <div class="rr"><span class="rk">MAC(K,r_B‖r_A‖ID_A)</span><span class="rv">${mac_B.substring(0,14)}...</span></div>
+      <div class="rr"><span class="rk">Alisa tasdiqlandi?</span><span class="rv ${macAMatch?'ok':'fail'}">${macAMatch?'✓ Ha':'✗ Yo\'q'}</span></div>
+    </div>
+    <div class="result-card full-r">
+      <h4>🔑 Protokol Natijasi</h4>
+      <div class="rr"><span class="rk">Ssenariy</span><span class="rv">${sc}</span></div>
+      <div class="rr"><span class="rk">Xabar soni</span><span class="rv">3 (ISO 9798-2)</span></div>
+      <div style="margin-top:10px">
+        <span class="status-badge ${success?'sb-ok':'sb-fail'}">${success?'✅ O\'ZARO AUTENTIFIKATSIYA MUVAFFAQIYATLI':'❌ AUTENTIFIKATSIYA MUVAFFAQIYATSIZ'}</span>
+      </div>
+    </div>`;
+
+  const log=document.getElementById('lab1_log');
+  log.innerHTML=`<span class="t-step">[ISO 9798-2]</span> Protokol boshlandi — 3-xabarli o'zaro autentifikatsiya<br>
+<span class="t-info">─────────────────────────────────────────</span><br>
+<span class="t-step">[① Alisa→Bob]</span> r_A = 0x${rA.substring(0,16)}...<br>
+<span class="t-step">[② Bob→Alisa]</span> r_B = 0x${rB.substring(0,16)}... + MAC_B<br>
+<span class="t-send">[Alisa]</span> Bob MAC ini tekshirdi → ${macBMatch?'✓ Bob tasdiqlandi!':'✗ Bob tasdiqlanmadi!'}<br>
+<span class="t-step">[③ Alisa→Bob]</span> MAC_A yuborildi<br>
+${eveNote?eveNote+'\n':''}
+<span class="t-recv">[Bob]</span> Alisa MAC ini tekshirdi → ${macAMatch?'✓ Alisa tasdiqlandi!':'✗ Alisa tasdiqlanmadi!'}<br>
+<span class="t-info">─────────────────────────────────────────</span><br>
+<span class="${success?'t-ok':'t-fail'}">[XULOSA]</span> ${success?'🎉 IKKI TOMON HAM O\'ZARO TASDIQLANDI!':'⚠️ AUTENTIFIKATSIYA MUVAFFAQIYATSIZ'}`;
+
+  document.getElementById('lab1_out').style.display='block';
+  drawCanvas('iso',rA,rB,mac_B,mac_A_correct,success);
+}
+
+function stepLab1(){
+  const idA=document.getElementById('l1_idA').value;
+  const idB=document.getElementById('l1_idB').value;
+  const K=document.getElementById('l1_key').value;
+
+  if(lab1Step===0){
+    lab1State={rA:hex16(),rB:hex16(),K,idA,idB};
+    document.getElementById('lab1_out').style.display='block';
+    document.getElementById('lab1_grid').innerHTML='';
+    document.getElementById('lab1_log').innerHTML=`<span class="t-step">[QADAM 1/3]</span> Alisa nonce yaratdi: r_A = 0x${lab1State.rA}<br><span class="t-send">[①→]</span> Alisa → Bob: r_A = 0x${lab1State.rA.substring(0,16)}...<br>`;
+    lab1Step=1;
+  } else if(lab1Step===1){
+    const mac_B=hmacDemo(K,lab1State.rB+lab1State.rA+idA);
+    lab1State.mac_B=mac_B;
+    document.getElementById('lab1_log').innerHTML+=`<span class="t-step">[QADAM 2/3]</span> Bob r_B yaratdi va MAC hisobladi<br><span class="t-recv">[②←]</span> Bob → Alisa: r_B ‖ MAC_B<br><span class="t-ok">✓ Alisa tekshirdi — Bob haqiqiy!</span><br>`;
+    lab1Step=2;
+  } else {
+    const mac_A=hmacDemo(K,lab1State.rA+lab1State.rB+idB);
+    document.getElementById('lab1_log').innerHTML+=`<span class="t-step">[QADAM 3/3]</span> Alisa MAC hisobladi va yubordi<br><span class="t-send">[③→]</span> Alisa → Bob: MAC_A<br><span class="t-ok">✓ Bob tekshirdi — Alisa haqiqiy!</span><br><span class="t-ok">🎉 O'ZARO AUTENTIFIKATSIYA MUVAFFAQIYATLI!</span>`;
+    lab1Step=0;
+  }
+}
+
+/* ─────────────────────────────────────
+   KERBEROS LAB
+───────────────────────────────────── */
+function runKerberos(){
+  const client=document.getElementById('k_client').value;
+  const service=document.getElementById('k_service').value;
+  const lifetime=parseInt(document.getElementById('k_lifetime').value);
+  const skew=parseInt(document.getElementById('k_skew').value);
+
+  const K_c=hex8(); const K_tgs=hex8(); const K_s=hex8();
+  const K_session_tgs=hex8(); const K_session_s=hex8();
+  const tgt=hex16(); const ticket=hex16();
+  const now=new Date();
+  const exp=new Date(now.getTime()+lifetime*3600000);
+  const allowed=skew<=5;
+  const ts=new Date(now.getTime()+skew*60000);
+
+  const log=document.getElementById('kerb_log');
+  log.innerHTML=`<span class="t-step">[KERBEROS v5]</span> Autentifikatsiya jarayoni boshlandi<br>
+<span class="t-info">══════════════════════════════════════════════</span><br>
+<span class="t-step">[1-BOSQICH: AS bilan — TGT olish]</span><br>
+<span class="t-send">[${client}→AS]</span> ID="${client}", ID_TGS="krbtgt", Timestamp=${now.toISOString()}<br>
+<span class="t-trent">[AS]</span> Foydalanuvchi "${client}" ma'lumotlar bazasida topildi<br>
+<span class="t-trent">[AS]</span> K_session_TGS = ${K_session_tgs} (yangi sessiya kaliti)<br>
+<span class="t-trent">[AS→${client}]</span> E_{K_c}(K_session_TGS) ‖ TGT<br>
+<span class="t-math">         </span> TGT = E_{K_TGS}(K_session_TGS ‖ ID="${client}" ‖ Lifetime=${lifetime}h)<br>
+<span class="t-math">         </span> TGT = ${tgt}<br>
+<span class="t-ok">[${client}]</span> ✓ TGT muvaffaqiyatli olindi!<br>
+<span class="t-info">──────────────────────────────────────────────</span><br>
+<span class="t-step">[2-BOSQICH: TGS bilan — Service Ticket olish]</span><br>
+<span class="t-send">[${client}→TGS]</span> ID_S="${service}" ‖ TGT ‖ Authenticator<br>
+<span class="t-math">          </span> Authenticator = E_{K_session_TGS}(ID="${client}" ‖ T=${ts.toISOString()})<br>
+<span class="t-trent">[TGS]</span> TGT ochildi → K_session_TGS olindi<br>
+<span class="t-trent">[TGS]</span> Authenticator tekshirildi: ΔT = ${skew} daqiqa (ruxsat = 5 daqiqa)<br>
+<span class="${allowed?'t-ok':'t-fail'}">[TGS]</span> ${allowed?'✓ Timestamp maqbul':'✗ Timestamp rad etildi! '+skew+' > 5 daqiqa'}<br>
+${allowed?`<span class="t-trent">[TGS]</span> K_session_S = ${K_session_s} (xizmat sessiya kaliti)<br>
+<span class="t-trent">[TGS→${client}]</span> E_{K_session_TGS}(K_session_S) ‖ ServiceTicket<br>
+<span class="t-math">           </span> ServiceTicket = ${ticket}<br>
+<span class="t-ok">[${client}]</span> ✓ Service Ticket muvaffaqiyatli olindi!<br>
+<span class="t-info">──────────────────────────────────────────────</span><br>
+<span class="t-step">[3-BOSQICH: Xizmatchiga kirish — O'ZARO TASDIQ]</span><br>
+<span class="t-send">[${client}→${service}]</span> ServiceTicket ‖ Authenticator_2<br>
+<span class="t-math">                </span> Auth_2 = E_{K_session_S}(ID="${client}" ‖ T=${now.toISOString()})<br>
+<span class="t-recv">[${service}]</span> Ticket ochildi → K_session_S olindi<br>
+<span class="t-recv">[${service}]</span> Authenticator_2 tekshirildi ✓<br>
+<span class="t-recv">[${service}→${client}]</span> E_{K_session_S}(T_client + 1) ← O'ZARO TASDIQ<br>
+<span class="t-ok">[${client}]</span> ✓ ${service} haqiqiy ekanini tasdiqladi!<br>
+<span class="t-info">──────────────────────────────────────────────</span><br>
+<span class="t-ok">[XULOSA]</span> 🎉 Kerberos o'zaro autentifikatsiya MUVAFFAQIYATLI!<br>
+<span class="t-info">[INFO]</span> Bilet muddati: ${exp.toISOString()} gacha`:'<span class="t-fail">[XULOSA]</span> ❌ Kerberos autentifikatsiya MUVAFFAQIYATSIZ — timestamp farqi katta!'}`;
+
+  document.getElementById('kerb_out').style.display='block';
+}
+function resetKerberos(){ document.getElementById('kerb_out').style.display='none'; }
+
+/* ─────────────────────────────────────
+   STS LAB
+───────────────────────────────────── */
+function randomSTS(){
+  const primes=[11,13,17,19,23,29,31,37,41,43,47,53,59,61,67,71,73,79,83,89,97];
+  const p=primes[rnd(5,primes.length-1)];
+  document.getElementById('sts_p').value=p;
+  document.getElementById('sts_g').value=rnd(2,6);
+  document.getElementById('sts_x').value=rnd(2,p-2);
+  document.getElementById('sts_y').value=rnd(2,p-2);
+}
+
+function runSTS(){
+  const p=parseInt(document.getElementById('sts_p').value);
+  const g=parseInt(document.getElementById('sts_g').value);
+  const x=parseInt(document.getElementById('sts_x').value);
+  const y=parseInt(document.getElementById('sts_y').value);
+
+  if(!isPrime(p)){alert('p tub son bo\'lishi kerak!');return;}
+  if(x>=p||y>=p){alert('x va y dan p kichik bo\'lishi kerak!');return;}
+
+  const gx=modpow(g,x,p);   // g^x mod p (Alice sends)
+  const gy=modpow(g,y,p);   // g^y mod p (Bob sends)
+  const K_A=modpow(gy,x,p); // g^{xy} mod p (Alice session key)
+  const K_B=modpow(gx,y,p); // g^{xy} mod p (Bob session key)
+  const match=K_A===K_B;
+
+  // Simulated signatures
+  const sk_A=hex8(); const sk_B=hex8();
+  const sig_B=hmacDemo(sk_B,String(gy)+String(gx)).substring(0,16);
+  const sig_A=hmacDemo(sk_A,String(gx)+String(gy)).substring(0,16);
+
+  const grid=document.getElementById('sts_grid');
+  grid.innerHTML=`
+    <div class="result-card alice-r">
+      <h4>👩 Alisa</h4>
+      <div class="rr"><span class="rk">Sir kalit x</span><span class="rv">${x}</span></div>
+      <div class="rr"><span class="rk">g^x mod p</span><span class="rv">${gx}</span></div>
+      <div class="rr"><span class="rk">Sessiya kaliti K</span><span class="rv ok">${K_A}</span></div>
+      <div class="rr"><span class="rk">Bob tasdiqlandi?</span><span class="rv ok">✓ σ_B tekshirildi</span></div>
+    </div>
+    <div class="result-card bob-r">
+      <h4>👨 Bob</h4>
+      <div class="rr"><span class="rk">Sir kalit y</span><span class="rv">${y}</span></div>
+      <div class="rr"><span class="rk">g^y mod p</span><span class="rv">${gy}</span></div>
+      <div class="rr"><span class="rk">Sessiya kaliti K</span><span class="rv ok">${K_B}</span></div>
+      <div class="rr"><span class="rk">Alisa tasdiqlandi?</span><span class="rv ok">✓ σ_A tekshirildi</span></div>
+    </div>
+    <div class="result-card full-r">
+      <h4>⚡ STS Natijasi</h4>
+      <div class="rr"><span class="rk">p (tub son)</span><span class="rv">${p}</span></div>
+      <div class="rr"><span class="rk">g (generator)</span><span class="rv">${g}</span></div>
+      <div class="rr"><span class="rk">g^{xy} mod p</span><span class="rv ok">${K_A}</span></div>
+      <div class="rr"><span class="rk">Kalitlar mos?</span><span class="rv ${match?'ok':'fail'}">${match?'✓ Ha — Forward Secrecy!':'✗ Yo\'q'}</span></div>
+      <div style="margin-top:10px">
+        <span class="status-badge ${match?'sb-ok':'sb-fail'}">${match?'✅ O\'ZARO AUTENTIFIKATSIYA + KALIT KELISHILDI':'❌ XATO'}</span>
+      </div>
+    </div>`;
+
+  const log=document.getElementById('sts_log');
+  log.innerHTML=`<span class="t-step">[STS PROTOKOL]</span> Station-to-Station — DH + Raqamli imzo<br>
+<span class="t-info">── Parametrlar: p=${p}, g=${g} ──────────────────</span><br>
+<span class="t-step">[①→]</span> Alisa sir son x=${x} tanladi → g^x = <span class="t-math">${gx}</span> Bob ga yubordi<br>
+<span class="t-step">[②←]</span> Bob sir son y=${y} tanladi → g^y = <span class="t-math">${gy}</span> Alisa ga yubordi + imzo σ_B<br>
+<span class="t-recv">        </span> Har ikkalasi ham K = <span class="t-ok">${K_A}</span> ni hisobladi (g^xy mod p)<br>
+<span class="t-send">[Alisa]</span> Bob imzosini tekshirdi → <span class="t-ok">✓ Bob haqiqiy!</span><br>
+<span class="t-step">[③→]</span> Alisa o'z imzosini σ_A yubordi<br>
+<span class="t-recv">[Bob]</span> Alisa imzosini tekshirdi → <span class="t-ok">✓ Alisa haqiqiy!</span><br>
+<span class="t-info">─────────────────────────────────────────────</span><br>
+<span class="t-ok">[XULOSA]</span> Sessiya kaliti K = <span class="t-math">${K_A}</span> — Forward Secrecy ✓<br>
+<span class="t-ok">[INFO]</span> Har sessiyada yangi x,y → eski kalitlar tiklab bo'lmaydi!`;
+
+  document.getElementById('sts_out').style.display='block';
+}
+
+/* ─────────────────────────────────────
+   CANVAS
+───────────────────────────────────── */
+let animTimer=null;
+let currentTheme=()=>document.documentElement.getAttribute('data-theme');
+
+function getColors(){
+  const d=currentTheme()==='dark';
+  return {
+    bg: d?'#070b14':'#f0f4fc',
+    grid: d?'rgba(120,170,255,0.05)':'rgba(60,100,200,0.06)',
+    alice: d?'#4d9fff':'#1a6fd4',
+    bob:   d?'#2ddb81':'#1a9a5c',
+    trent: d?'#a78bfa':'#6d4fc2',
+    eve:   d?'#ff5f57':'#d32f2f',
+    text:  d?'rgba(232,238,248,0.7)':'rgba(14,26,48,0.7)',
+    msg:   d?'#f5a623':'#c47a00',
+    ok:    d?'#2ddb81':'#1a9a5c',
+    border:d?'rgba(120,170,255,0.15)':'rgba(60,100,200,0.2)',
+    surface:d?'rgba(26,42,71,0.8)':'rgba(255,255,255,0.85)',
+  };
+}
+
+function drawCanvas(mode,rA,rB,macB,macA,success){
+  const canvas=document.getElementById('mainCanvas');
+  if(!canvas)return;
+  const dpr=window.devicePixelRatio||1;
+  canvas.width=(canvas.offsetWidth||800)*dpr;
+  canvas.height=300*dpr;
+  const ctx=canvas.getContext('2d');
+  ctx.scale(dpr,dpr);
+  const W=canvas.offsetWidth||800, H=300;
+  const C=getColors();
+
+  ctx.fillStyle=C.bg; ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle=C.grid; ctx.lineWidth=1;
+  for(let x=0;x<W;x+=48){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+  for(let y=0;y<H;y+=48){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+
+  if(!mode){
+    // Default: show 3-party diagram
+    const ax=120,bx=W-120,cy=150;
+    drawActor(ctx,ax,cy,C.alice,'👩','Alisa',C.surface,C.alice);
+    drawActor(ctx,bx,cy,C.bob,'👨','Bob',C.surface,C.bob);
+    ctx.fillStyle=C.text;ctx.font='13px DM Mono';ctx.textAlign='center';
+    ctx.fillText('ISO/IEC 9798-2 — 3-xabarli o\'zaro autentifikatsiya',W/2,28);
+    ctx.fillStyle=C.border;
+    drawArrow(ctx,ax+40,cy-15,bx-40,cy-15,C.alice,'① r_A →');
+    drawArrow(ctx,bx-40,cy,ax+40,cy,C.bob,'② r_B ‖ MAC_B ←');
+    drawArrow(ctx,ax+40,cy+15,bx-40,cy+15,C.alice,'③ MAC_A →');
+    return;
+  }
+}
+
+function drawActor(ctx,x,y,color,ico,name,bg,border){
+  ctx.save();
+  ctx.fillStyle=bg;
+  ctx.strokeStyle=border;
+  ctx.lineWidth=1.5;
+  ctx.beginPath();
+  const r=36;
+  ctx.arc(x,y,r,0,Math.PI*2);
+  ctx.fill();ctx.stroke();
+  ctx.fillStyle=color;
+  ctx.font=`bold 13px Outfit`;
+  ctx.textAlign='center';
+  ctx.fillText(name,x,y+5);
+  ctx.restore();
+}
+
+function drawArrow(ctx,x1,y1,x2,y2,color,label){
+  ctx.save();
+  ctx.strokeStyle=color; ctx.lineWidth=1.5; ctx.setLineDash([5,3]);
+  ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+  ctx.setLineDash([]);
+  const a=Math.atan2(y2-y1,x2-x1);
+  ctx.fillStyle=color;
+  ctx.beginPath();
+  ctx.moveTo(x2,y2);
+  ctx.lineTo(x2-10*Math.cos(a-.4),y2-10*Math.sin(a-.4));
+  ctx.lineTo(x2-10*Math.cos(a+.4),y2-10*Math.sin(a+.4));
+  ctx.closePath();ctx.fill();
+  if(label){
+    ctx.fillStyle=color;ctx.font='11px DM Mono';ctx.textAlign='center';
+    const mx=(x1+x2)/2,my=(y1+y2)/2;
+    ctx.fillText(label,mx,my-8);
+  }
+  ctx.restore();
+}
+
+function redrawCanvas(){setTimeout(drawCanvas,50);}
+
+function animISO(){
+  if(animTimer)clearInterval(animTimer);
+  const canvas=document.getElementById('mainCanvas');
+  const ctx=canvas.getContext('2d');
+  const dpr=window.devicePixelRatio||1;
+  const W=canvas.offsetWidth||800, H=300;
+  let t=0;
+  const C=getColors();
+  const ax=140,bx=W-140,cy=150;
+
+  animTimer=setInterval(()=>{
+    ctx.fillStyle=C.bg; ctx.fillRect(0,0,W,H);
+    ctx.strokeStyle=C.grid;ctx.lineWidth=1;
+    for(let x=0;x<W;x+=48){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+    drawActor(ctx,ax,cy,C.alice,'👩','Alisa',C.surface,C.alice);
+    drawActor(ctx,bx,cy,C.bob,'👨','Bob',C.surface,C.bob);
+    ctx.fillStyle=C.text;ctx.font='12px DM Mono';ctx.textAlign='center';
+    ctx.fillText('ISO/IEC 9798-2 — 3-xabarli o\'zaro autentifikatsiya',W/2,22);
+
+    const p1=Math.min(Math.max((t-10)/50,0),1);
+    const p2=Math.min(Math.max((t-70)/50,0),1);
+    const p3=Math.min(Math.max((t-130)/50,0),1);
+
+    if(t>10){
+      const px=ax+38+(bx-38-ax-38)*p1;
+      ctx.beginPath();ctx.arc(px,cy-20,7,0,Math.PI*2);
+      ctx.fillStyle=C.alice;ctx.fill();
+      ctx.fillStyle=C.alice;ctx.font='10px DM Mono';ctx.textAlign='center';
+      ctx.fillText('r_A',ax+(bx-ax)*p1/2,cy-34);
+    }
+    if(t>70){
+      const px=bx-38-(bx-38-ax-38)*p2;
+      ctx.beginPath();ctx.arc(px,cy,7,0,Math.PI*2);
+      ctx.fillStyle=C.bob;ctx.fill();
+      ctx.fillStyle=C.bob;ctx.font='10px DM Mono';ctx.textAlign='center';
+      ctx.fillText('r_B ‖ MAC_B',bx-(bx-ax)*p2/2,cy+20);
+    }
+    if(t>130){
+      const px=ax+38+(bx-38-ax-38)*p3;
+      ctx.beginPath();ctx.arc(px,cy+20,7,0,Math.PI*2);
+      ctx.fillStyle=C.msg;ctx.fill();
+      ctx.fillStyle=C.msg;ctx.font='10px DM Mono';ctx.textAlign='center';
+      ctx.fillText('MAC_A',ax+(bx-ax)*p3/2,cy+38);
+    }
+    if(t>190){
+      ctx.beginPath();ctx.arc(ax,cy,36,0,Math.PI*2);
+      ctx.strokeStyle=C.ok;ctx.lineWidth=3;ctx.stroke();
+      ctx.beginPath();ctx.arc(bx,cy,36,0,Math.PI*2);
+      ctx.strokeStyle=C.ok;ctx.lineWidth=3;ctx.stroke();
+      ctx.fillStyle=C.ok;ctx.font='bold 11px Outfit';ctx.textAlign='center';
+      ctx.fillText('✓ OK',ax,cy+52);
+      ctx.fillText('✓ OK',bx,cy+52);
+      ctx.fillStyle=C.ok;ctx.font='bold 13px Outfit';
+      ctx.fillText('O\'ZARO AUTENTIFIKATSIYA MUVAFFAQIYATLI!',W/2,H-14);
+    }
+    t++;
+    if(t>230)clearInterval(animTimer);
+  },18);
+}
+
+function animReplay(){
+  if(animTimer)clearInterval(animTimer);
+  const canvas=document.getElementById('mainCanvas');
+  const ctx=canvas.getContext('2d');
+  const W=canvas.offsetWidth||800, H=300;
+  let t=0;
+  const C=getColors();
+  const ax=100,ex=W/2,bx=W-100,cy=150;
+
+  animTimer=setInterval(()=>{
+    ctx.fillStyle=C.bg;ctx.fillRect(0,0,W,H);
+    ctx.strokeStyle=C.grid;ctx.lineWidth=1;
+    for(let x=0;x<W;x+=48){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+
+    drawActor(ctx,ax,cy,C.alice,'👩','Alisa',C.surface,C.alice);
+    drawActor(ctx,ex,cy,C.eve,'😈','Eva',C.surface,C.eve);
+    drawActor(ctx,bx,cy,C.bob,'👨','Bob',C.surface,C.bob);
+
+    ctx.fillStyle=C.text;ctx.font='12px DM Mono';ctx.textAlign='center';
+    ctx.fillText('REPLAY HUJUMI → ISO 9798-2 himoyasi',W/2,22);
+
+    const p1=Math.min(Math.max((t-10)/50,0),1);
+    if(t>10){
+      const px=ax+38+(ex-38-ax-38)*p1;
+      ctx.beginPath();ctx.arc(px,cy-15,6,0,Math.PI*2);
+      ctx.fillStyle=C.alice;ctx.fill();
+      ctx.fillStyle=C.alice;ctx.font='9px DM Mono';ctx.textAlign='center';
+      ctx.fillText('r_A, MAC_A',ax+(ex-ax)*p1/2,cy-28);
+    }
+    if(t>70){
+      ctx.fillStyle=C.eve;ctx.font='10px DM Mono';ctx.textAlign='center';
+      ctx.fillText('Eski MAC_A saqlandi!',ex,cy+54);
+      const pr=Math.min((t-70)/50,1);
+      const px=ex+38+(bx-38-ex-38)*pr;
+      ctx.beginPath();ctx.arc(px,cy+15,6,0,Math.PI*2);
+      ctx.fillStyle=C.eve;ctx.fill();
+      ctx.fillStyle=C.eve;ctx.font='9px DM Mono';ctx.textAlign='center';
+      ctx.fillText('REPLAY → eski MAC_A',ex+(bx-ex)*pr/2,cy+32);
+    }
+    if(t>140){
+      ctx.beginPath();ctx.arc(bx,cy,36,0,Math.PI*2);
+      ctx.strokeStyle=C.eve;ctx.lineWidth=3;ctx.stroke();
+      ctx.fillStyle=C.eve;ctx.font='bold 10px Outfit';ctx.textAlign='center';
+      ctx.fillText('✗ RAD!',bx,cy+54);
+      ctx.fillStyle=C.ok;ctx.font='bold 11px Outfit';
+      ctx.fillText('Yangi r_B nonce → eski MAC mos kelmadi → HUJUM BLOKLANDI!',W/2,H-14);
+    }
+    t++;
+    if(t>200)clearInterval(animTimer);
+  },20);
+}
+
+function animMITM(){
+  if(animTimer)clearInterval(animTimer);
+  const canvas=document.getElementById('mainCanvas');
+  const ctx=canvas.getContext('2d');
+  const W=canvas.offsetWidth||800, H=300;
+  let t=0;
+  const C=getColors();
+  const ax=100,ex=W/2,bx=W-100,cy=150;
+
+  animTimer=setInterval(()=>{
+    ctx.fillStyle=C.bg;ctx.fillRect(0,0,W,H);
+    ctx.strokeStyle=C.grid;ctx.lineWidth=1;
+    for(let x=0;x<W;x+=48){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+
+    drawActor(ctx,ax,cy,C.alice,'👩','Alisa',C.surface,C.alice);
+    drawActor(ctx,ex,cy,C.eve,'😈','Eva',C.surface,C.eve);
+    drawActor(ctx,bx,cy,C.bob,'👨','Bob',C.surface,C.bob);
+
+    ctx.fillStyle=C.text;ctx.font='12px DM Mono';ctx.textAlign='center';
+    ctx.fillText('MITM HUJUMI → STS imzo himoyasi',W/2,22);
+
+    ctx.fillStyle=`rgba(255,95,87,${Math.min(t/60,0.12)})`;
+    ctx.fillRect(ex-55,40,110,H-80);
+
+    if(t>20){
+      const p=Math.min((t-20)/50,1);
+      const px=ax+38+(ex-38-ax-38)*p;
+      ctx.beginPath();ctx.arc(px,cy-15,6,0,Math.PI*2);
+      ctx.fillStyle=C.alice;ctx.fill();
+      ctx.fillStyle=C.alice;ctx.font='9px DM Mono';ctx.textAlign='center';
+      ctx.fillText('g^x →',ax+(ex-ax)*p/2,cy-28);
+    }
+    if(t>80){
+      const p=Math.min((t-80)/50,1);
+      const px=ex+38+(bx-38-ex-38)*p;
+      ctx.beginPath();ctx.arc(px,cy+15,6,0,Math.PI*2);
+      ctx.fillStyle=C.eve;ctx.fill();
+      ctx.fillStyle=C.eve;ctx.font='9px DM Mono';ctx.textAlign='center';
+      ctx.fillText('g^z (Eva!) →',ex+(bx-ex)*p/2,cy+32);
+    }
+    if(t>150){
+      ctx.fillStyle=C.ok;ctx.font='bold 12px DM Mono';ctx.textAlign='center';
+      ctx.fillText('STS: Sign(sk_B, g^y‖g^x)',W/2,H-32);
+      ctx.fillStyle=C.ok;ctx.font='bold 11px Outfit';
+      ctx.fillText('Alisa Verify(pk_B,σ_B) = FALSE → MITM ANIQLANDI!',W/2,H-14);
+    }
+    t++;
+    if(t>210)clearInterval(animTimer);
+  },20);
+}
+
+setTimeout(drawCanvas,150);
+
+/* ─────────────────────────────────────
+   QUIZ
+───────────────────────────────────── */
+const QQ=[
+  {q:"ISO/IEC 9798-2 protokolida nechta xabar almashinadi?",opts:["2 ta","3 ta","4 ta","5 ta"],ans:1,exp:"ISO 9798-2 (3-xabarli) protokoli: ① r_A, ② r_B‖MAC_B, ③ MAC_A — jami 3 ta xabar bilan o'zaro autentifikatsiya amalga oshiriladi."},
+  {q:"O'zaro autentifikatsiyada ikki nonce (r_A va r_B) ishlatilishining asosiy sababi nima?",opts:["Tezlikni oshirish","Ikkala tomonga nisbatan replay hujumidan himoya","Shifrlash uchun","Kalitni uzaytirish"],ans:1,exp:"r_A Alisa tomoniga, r_B Bob tomoniga nisbatan replay hujumini bloklaydi. Ikkala nonce birga MAC-ga kiritilib, ikki tomonlama freshness ta'minlanadi."},
+  {q:"Reflection attack-dan himoya uchun ISO 9798-2 qanday yechim qo'llaydi?",opts:["Katta nonce ishlatish","MAC ichiga ID_A va ID_B qo'shish","Timestamp qo'shish","Ko'proq xabar almashinish"],ans:1,exp:"MAC(K, r_B‖r_A‖ID_A) — identifikatorlarni qo'shish reflection hujumini bloklaydi. Eva ID_A va ID_B ni almashtirib qo'ya olmaydi."},
+  {q:"Needham-Schroeder protokolidagi Lowe hujumini qanday tuzatish mumkin?",opts:["Yangi nonce qo'shish","② xabarga ID_B qo'shish","Sessiya kalitini almashtirish","Timestamp qo'shish"],ans:1,exp:"NSL tuzatmasi: B→A: E_{K_S}(r_B ‖ ID_B) — Bob ID_B ni MAC/shifrlashga kiritadi. Bu Eva'ning impersonatsiya hujumini bloklaydi."},
+  {q:"Kerberos protokolida timestamp ning roli nima?",opts:["Kalit uzunligini belgilash","Replay hujumidan himoya (±5 daqiqa)","Sessiya muddatini belgilash","TGT ni shifrlash"],ans:1,exp:"Kerberos timestamp ±5 daqiqa farq bilan tekshiradi. Agar hujumchi eski Authenticator-ni qayta yuborse, vaqt farqi oshib ketadi → RAD etiladi."},
+  {q:"STS (Station-to-Station) protokolining DH ga nisbatan asosiy afzalligi nima?",opts:["Tezroq hisoblash","Raqamli imzo orqali o'zaro autentifikatsiya va MITM himoyasi","Kamroq xabar","KDC kerak emas"],ans:1,exp:"Sof DH MITM ga zaif. STS imzo qo'shadi: Sign(sk_B, g^y‖g^x) — Eva g^x ni g^z bilan almashtirolmaydi, chunki Bob imzosi noto'g'ri bo'ladi."},
+  {q:"Forward Secrecy (PFS) qaysi protokolda mavjud?",opts:["ISO 9798-2","Needham-Schroeder","Kerberos v5","STS (Diffie-Hellman bilan)"],ans:3,exp:"STS har sessiyada yangi DH kalitlari (x,y) ishlatadi → eski sessiyalar tiklab bo'lmaydi. ISO, NS, Kerberos statik kalitlar ishlatadi — PFS yo'q."},
+  {q:"Kerberos protokolida KDC kompromis bo'lsa nima sodir bo'ladi?",opts:["Faqat joriy sessiya xavf ostida","Barcha foydalanuvchilarning kalitlari fosh bo'ladi","Hech narsa bo'lmaydi","Faqat TGT fosh bo'ladi"],ans:1,exp:"KDC barcha K_c va K_s kalitlarni saqlaydi. KDC buzilsa — barcha foydalanuvchilar kalitlari fosh bo'ladi. STS da bunday markaziy nuqta yo'q."},
+];
+let cQ=0,sQ=0;
+
+function renderQ(){
+  if(cQ>=QQ.length){showQScore();return;}
+  document.getElementById('qProg').style.width=(cQ/QQ.length*100)+'%';
+  const q=QQ[cQ];
+  document.getElementById('qCard').innerHTML=`
+    <div class="q-num">SAVOL ${cQ+1} / ${QQ.length}</div>
+    <div class="q-text">${q.q}</div>
+    ${q.opts.map((o,i)=>`<button class="q-opt" onclick="ansQ(${i})">${String.fromCharCode(65+i)}. ${o}</button>`).join('')}
+    <div class="q-fb" id="qFb"></div>`;
+}
+
+function ansQ(i){
+  const q=QQ[cQ];
+  document.querySelectorAll('.q-opt').forEach(o=>o.disabled=true);
+  document.querySelectorAll('.q-opt')[i].classList.add(i===q.ans?'correct':'wrong');
+  if(i!==q.ans)document.querySelectorAll('.q-opt')[q.ans].classList.add('correct');
+  const fb=document.getElementById('qFb');
+  fb.className='q-fb on '+(i===q.ans?'ok-fb':'err-fb');
+  fb.innerHTML=(i===q.ans?'✅ ':'❌ ')+q.exp;
+  if(i===q.ans)sQ++;
+  setTimeout(()=>{cQ++;renderQ();},2500);
+}
+
+function showQScore(){
+  document.getElementById('qWrap').style.display='none';
+  document.getElementById('qScore').style.display='block';
+  document.getElementById('sNum').textContent=`${sQ}/${QQ.length}`;
+  const p=sQ/QQ.length;
+  let m,d;
+  if(p>=0.87){m="🏆 A'lo! Zo'r natija!";d="O'zaro autentifikatsiyani mukammal o'zlashtirdingiz!"}
+  else if(p>=0.7){m="✅ Yaxshi!";d="Asosiy protokollar yaxshi o'zlashtirilgan."}
+  else if(p>=0.5){m="📖 O'rtacha";d="Protokollar va hujumlar bo'limini qayta ko'ring."}
+  else{m="📚 Davom eting!";d="Nazariya va laboratoriyani yana ko'rib chiqing."}
+  document.getElementById('sMsg').textContent=m;
+  document.getElementById('sDet').textContent=d;
+}
+
+function restartQuiz(){
+  cQ=0;sQ=0;
+  document.getElementById('qWrap').style.display='block';
+  document.getElementById('qScore').style.display='none';
+  renderQ();
+}
+
+renderQ();
+
+/* ─────────────────────────────────────
+   INTERAKTIV: math bloklarga copy qo'shish
+───────────────────────────────────── */
+document.querySelectorAll('.math:not(.math-block)').forEach(m=>{
+  if(m.querySelector('.copy-btn')) return;
+  m.classList.add('math-block');
+  m.style.paddingRight='48px';
+  const btn=document.createElement('button');
+  btn.className='copy-btn'; btn.title='Nusxa olish'; btn.textContent='📋';
+  btn.onclick=function(){ copyMath(this); };
+  m.style.position='relative';
+  m.appendChild(btn);
+});
+
+const CORRECT_ORDER=['r_A yuboriladi','r_B ‖ MAC_B qaytariladi','MAC_A yuboriladi'];
+function shuffleProtocolOrder(){
+  const wrap=document.getElementById('protocolOrderWrap');
+  if(!wrap){ return; }
+  const items=[...wrap.querySelectorAll('.order-item')];
+  for(let i=items.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [items[i],items[j]]=[items[j],items[i]]; }
+  items.forEach(it=>wrap.appendChild(it));
+  wrap.querySelectorAll('.order-item').forEach((x,j)=>{ x.dataset.idx=j; x.querySelector('.order-num').textContent=j+1; });
+  document.getElementById('orderFeedback').textContent='';
+}
+function checkProtocolOrder(){
+  const items=[...document.querySelectorAll('#protocolOrderWrap .order-item')];
+  const order=items.map(i=>i.dataset.step||'');
+  const ok=order.length===3&&order.every((o,i)=>o===CORRECT_ORDER[i]);
+  const fb=document.getElementById('orderFeedback');
+  if(fb){ fb.textContent=ok?'✅ To\'g\'ri!':"❌ Noto'g'ri. To'g'ri tartib: ① r_A → ② r_B‖MAC_B → ③ MAC_A"; fb.style.color=ok?'var(--green)':'var(--red)'; }
+}
+function setupProtocolOrderDrag(){
+  const wrap=document.getElementById('protocolOrderWrap');
+  if(!wrap) return;
+  wrap.querySelectorAll('.order-item').forEach((el,i)=>{
+    el.dataset.idx=i;
+    el.ondragstart=e=>{ e.dataTransfer.setData('text',el.dataset.idx); };
+    el.ondragover=e=>{ e.preventDefault(); el.classList.add('drag-over'); };
+    el.ondragleave=()=>el.classList.remove('drag-over');
+    el.ondrop=e=>{
+      e.preventDefault(); el.classList.remove('drag-over');
+      const fromIdx=e.dataTransfer.getData('text');
+      const from=wrap.querySelector(`[data-idx="${fromIdx}"]`);
+      if(from&&from!==el){ wrap.insertBefore(from,el); wrap.querySelectorAll('.order-item').forEach((x,j)=>{ x.dataset.idx=j; x.querySelector('.order-num').textContent=j+1; }); }
+    };
+  });
+}
+document.addEventListener('DOMContentLoaded',setupProtocolOrderDrag);
+
+window.addEventListener('resize',()=>{
+  if(document.getElementById('lab')?.classList.contains('active')) drawCanvas();
+});
+</script>
+</body>
+</html>
